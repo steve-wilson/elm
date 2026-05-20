@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Split or Regret — Reflection</title>
+<script>
+  try {
+    const s = JSON.parse(localStorage.getItem('sor_state') || '{}');
+    document.documentElement.className = 'theme-' + (s.theme || 'clean');
+  } catch(e) {}
+</script>
+<link rel="stylesheet" href="css/shared.css">
+</head>
+<body>
+<div class="placeholder-page">
+  <h1>Reflection</h1>
+  <p>Quiz and reflection questions — coming soon.</p>
+  <a href="level3.html" style="color:var(--accent);">← Back to Level 3</a>
+</div>
+<script src="js/state.js"></script>
+<script src="js/themes.js"></script>
+<script>Themes.fromState();</script>
+</body>
+</html>

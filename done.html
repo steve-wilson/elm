@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Split or Regret — Done</title>
+<script>
+  try {
+    const s = JSON.parse(localStorage.getItem('sor_state') || '{}');
+    document.documentElement.className = 'theme-' + (s.theme || 'clean');
+  } catch(e) {}
+</script>
+<link rel="stylesheet" href="css/shared.css">
+</head>
+<body>
+<div class="placeholder-page">
+  <h1>You're done!</h1>
+  <p>Download your session log to submit with your assignment.</p>
+  <button class="btn btn-train" onclick="downloadLog()" style="margin-top:8px;">Download Log</button>
+  <a href="index.html" style="color:var(--accent);margin-top:8px;">Start over</a>
+</div>
+<script src="js/state.js"></script>
+<script src="js/log.js"></script>
+<script src="js/themes.js"></script>
+<script>
+  Themes.fromState();
+  function downloadLog() {
+    Log.download();
+  }
+</script>
+</body>
+</html>

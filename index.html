@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Split or Regret</title>
+<link rel="stylesheet" href="css/shared.css">
+<style>
+  body { background: #1a1a2e; display: flex; align-items: center; justify-content: center; }
+</style>
+</head>
+<body>
+
+<div class="picker-card">
+  <h1>Split or Regret</h1>
+  <p>Pick a vibe to get started</p>
+  <div class="picker-options">
+    <button class="picker-btn" onclick="start('clean')">
+      <div class="swatch swatch-clean"></div>Clean
+    </button>
+    <button class="picker-btn" onclick="start('dark')">
+      <div class="swatch swatch-dark"></div>Dark
+    </button>
+    <button class="picker-btn" onclick="start('retro')">
+      <div class="swatch swatch-retro"></div>Retro Terminal
+    </button>
+    <button class="picker-btn" onclick="start('candy')">
+      <div class="swatch swatch-candy"></div>Candy
+    </button>
+  </div>
+</div>
+
+<script src="js/state.js"></script>
+<script src="js/log.js"></script>
+<script>
+  function start(theme) {
+    State.set('theme', theme);
+    if (!State.get('startedAt')) {
+      State.set('startedAt', new Date().toISOString());
+      Log.event('session_start', { theme });
+    }
+    window.location.href = 'level1.html';
+  }
+</script>
+</body>
+</html>
