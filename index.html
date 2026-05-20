@@ -3,44 +3,83 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Split or Regret</title>
-<link rel="stylesheet" href="css/shared.css">
+<title>ML Interactive Modules</title>
 <style>
-  body { background: #1a1a2e; display: flex; align-items: center; justify-content: center; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f5f7fa; color: #1a1a2e; min-height: 100vh; }
+
+  header {
+    background: #fff; border-bottom: 1px solid #dde1e7;
+    padding: 20px 32px; display: flex; align-items: baseline; gap: 12px;
+  }
+  header h1 { font-size: 1.25rem; font-weight: 700; }
+  header span { color: #6b7280; font-size: 0.9rem; }
+
+  main { max-width: 760px; margin: 40px auto; padding: 0 24px; }
+  main > h2 { font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #6b7280; margin-bottom: 16px; }
+
+  .module-list { display: flex; flex-direction: column; gap: 12px; }
+
+  .module-card {
+    background: #fff; border: 1px solid #dde1e7; border-radius: 10px;
+    padding: 20px 24px; display: flex; align-items: center; gap: 20px;
+    text-decoration: none; color: inherit; transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .module-card:hover { border-color: #3b82f6; box-shadow: 0 2px 8px rgba(59,130,246,0.1); }
+  .module-card.locked { opacity: 0.5; cursor: default; pointer-events: none; }
+
+  .module-num {
+    font-size: 1.4rem; font-weight: 800; color: #3b82f6;
+    width: 36px; flex-shrink: 0; text-align: center;
+  }
+  .module-info { flex: 1; }
+  .module-info h3 { font-size: 1rem; font-weight: 700; margin-bottom: 3px; }
+  .module-info p  { font-size: 0.85rem; color: #6b7280; line-height: 1.4; }
+
+  .module-badge {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 3px 10px; border-radius: 20px; white-space: nowrap;
+  }
+  .badge-available { background: #d1fae5; color: #065f46; }
+  .badge-soon      { background: #f3f4f6; color: #9ca3af; }
+
+  .arrow { color: #cbd5e1; font-size: 1.1rem; }
+  .module-card:hover .arrow { color: #3b82f6; }
 </style>
 </head>
 <body>
 
-<div class="picker-card">
-  <h1>Split or Regret</h1>
-  <p>Pick a vibe to get started</p>
-  <div class="picker-options">
-    <button class="picker-btn" onclick="start('clean')">
-      <div class="swatch swatch-clean"></div>Clean
-    </button>
-    <button class="picker-btn" onclick="start('dark')">
-      <div class="swatch swatch-dark"></div>Dark
-    </button>
-    <button class="picker-btn" onclick="start('retro')">
-      <div class="swatch swatch-retro"></div>Retro Terminal
-    </button>
-    <button class="picker-btn" onclick="start('candy')">
-      <div class="swatch swatch-candy"></div>Candy
-    </button>
-  </div>
-</div>
+<header>
+  <h1>ML Interactive Modules</h1>
+  <span>Pre-class activities</span>
+</header>
 
-<script src="js/state.js"></script>
-<script src="js/log.js"></script>
-<script>
-  function start(theme) {
-    State.set('theme', theme);
-    if (!State.get('startedAt')) {
-      State.set('startedAt', new Date().toISOString());
-      Log.event('session_start', { theme });
-    }
-    window.location.href = 'level1.html';
-  }
-</script>
+<main>
+  <h2>Modules</h2>
+  <div class="module-list">
+
+    <a href="split-or-regret/index.html" class="module-card">
+      <div class="module-num">1</div>
+      <div class="module-info">
+        <h3>Split or Regret</h3>
+        <p>Learn why train/validation/test splits exist by living through the consequences of getting them wrong.</p>
+      </div>
+      <span class="module-badge badge-available">Available</span>
+      <span class="arrow">›</span>
+    </a>
+
+    <div class="module-card locked">
+      <div class="module-num" style="color:#9ca3af;">2</div>
+      <div class="module-info">
+        <h3>More modules coming</h3>
+        <p>Additional interactive activities will appear here as they are released.</p>
+      </div>
+      <span class="module-badge badge-soon">Coming soon</span>
+    </div>
+
+  </div>
+</main>
+
 </body>
 </html>
