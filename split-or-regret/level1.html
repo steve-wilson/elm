@@ -198,6 +198,26 @@
   });
   document.addEventListener('mouseup', () => { dragging = false; dragMode = null; });
 
+  // Touch equivalents for drag-to-select
+  grid.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    const el = document.elementFromPoint(t.clientX, t.clientY)?.closest('.block');
+    if (!el) return;
+    dragging = true;
+    dragMode = selected.has(+el.dataset.i) ? 'remove' : 'add';
+    applyToBlock(el);
+  }, { passive: false });
+
+  grid.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    const el = document.elementFromPoint(t.clientX, t.clientY)?.closest('.block');
+    if (el) applyToBlock(el);
+  }, { passive: false });
+
+  grid.addEventListener('touchend', () => { dragging = false; dragMode = null; });
+
   function applyToBlock(el) {
     const i = +el.dataset.i;
     if (dragMode === 'add') {

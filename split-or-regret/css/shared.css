@@ -95,7 +95,7 @@ main { flex: 1; padding: 24px; max-width: 960px; margin: 0 auto; width: 100%; }
   background: var(--block-default); cursor: pointer;
   transition: background 0.15s, transform 0.1s; border: 1px solid transparent;
 }
-.block:hover { transform: scale(1.15); }
+@media (hover: hover) { .block:hover { transform: scale(1.15); } }
 .block.selected { background: var(--block-selected); }
 
 /* ── Controls ── */
@@ -188,3 +188,22 @@ main { flex: 1; padding: 24px; max-width: 960px; margin: 0 auto; width: 100%; }
 }
 .placeholder-page h1 { font-size: 2rem; }
 .placeholder-page p  { color: var(--muted); max-width: 400px; line-height: 1.6; }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  #data-grid { grid-template-columns: repeat(15, 1fr); }
+}
+
+@media (max-width: 480px) {
+  #data-grid     { grid-template-columns: repeat(10, 1fr); gap: 3px; }
+  main           { padding: 14px; }
+  header         { padding: 10px 14px; }
+  #grid-container { padding: 12px; }
+  #controls      { padding: 12px 14px; }
+  #accuracy-panel { padding: 12px 14px; }
+  .picker-card   { padding: 24px 18px; }
+  .header-btn    { padding: 8px 10px; }
+  .accuracy-label { width: 80px; font-size: 0.78rem; }
+  .run-mini-bar-bg { display: none; }
+  .run-data      { display: none; }
+}
