@@ -200,6 +200,14 @@
       </div>
     </div>
 
+    <!-- Run history -->
+    <div id="history-panel" style="display:none;margin-top:16px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+        <div class="section-label" style="margin-bottom:12px;">Run History</div>
+        <div id="history-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+    </div>
+
     <!-- Deploy -->
     <div id="deploy-section">
       <div class="section-label" style="margin-bottom:12px;">🚀 Deploy a model</div>
@@ -274,6 +282,9 @@ let deployed    = false;
 let checkinVal  = null;
 
 const mSt = CURVES.map(() => ({ trained:false, tuneCount:0, trainAcc:null, testAcc:null, tested:false }));
+
+let l2Runs  = [];
+let l2RunCnt = 0;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 Themes.fromState();
@@ -392,6 +403,9 @@ function doTrain() {
     document.getElementById('test-acc-row').style.display = 'none';
     document.getElementById('tune-btn').textContent = '⚙ Tune';
     renderModelBtns();
+    l2RunCnt++;
+    l2Runs.unshift({ id: l2RunCnt, modelIdx: selModel, modelName: getLabels()[selModel], splitPt, trainAcc: ms.trainAcc, testAcc: null });
+    renderL2History(false);
     Log.event('l2_train', { model: selModel, splitPt, trainAcc: ms.trainAcc });
     State.setLevel(2, { started: true });
     updateBanner();
@@ -450,6 +464,12 @@ function doCheckTest() {
   document.getElementById('test-acc-row').style.display = 'flex';
   setBar('test-bar', 'test-pct', ms.testAcc);
   renderPeek();
+
+  // Update history: find/update this model's latest run entry
+  const curRun = l2Runs.find(r => r.modelIdx === selModel);
+  if (curRun) curRun.testAcc = ms.testAcc;
+  const prevBests = l2Runs.filter(r => r !== curRun && r.testAcc !== null).map(r => r.testAcc);
+  renderL2History(prevBests.length > 0 && ms.testAcc > Math.max(...prevBests));
 
   const deployEl = document.getElementById('deploy-section');
   if (deployEl.style.display === 'none') {
@@ -653,6 +673,105 @@ function runProg(duration, total, verb, onDone) {
   })(performance.now());
 }
 
+// ── Run history ───────────────────────────────────────────────────────────────
+function getL2Score(run) {
+  // Tested runs rank by test acc; untested runs rank lower
+  return run.testAcc !== null ? run.testAcc : run.trainAcc * 0.88;
+}
+
+function renderL2History(newBest) {
+  const panel = document.getElementById('history-panel');
+  const list  = document.getElementById('history-list');
+  if (l2Runs.length < 2) { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  list.innerHTML = '';
+
+  list.appendChild(makeL2RunEntry(l2Runs[1], 'previous', false));
+
+  const divider = document.createElement('div');
+  divider.style.cssText = 'font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-top:8px;margin-bottom:4px;';
+  divider.textContent = 'Top 3';
+  list.appendChild(divider);
+
+  [...l2Runs].sort((a, b) => getL2Score(b) - getL2Score(a)).slice(0, 3).forEach((run, rank) => {
+    const isRunNewBest = newBest && rank === 0 && run === l2Runs[0];
+    list.appendChild(makeL2RunEntry(run, 'top', isRunNewBest, rank + 1));
+  });
+}
+
+function makeL2RunEntry(run, type, isNewBest, rank) {
+  const el = document.createElement('div');
+  el.className = 'run-entry' + (isNewBest ? ' new-best' : '');
+
+  const tag = document.createElement('span');
+  tag.className = 'run-tag ' + (type === 'previous' ? 'tag-previous' : rank === 1 ? 'tag-best' : 'tag-top');
+  tag.textContent = type === 'previous' ? 'Previous' : '#' + rank;
+  el.appendChild(tag);
+
+  const runId = document.createElement('span');
+  runId.className = 'run-id';
+  runId.textContent = 'Run ' + run.id;
+  el.appendChild(runId);
+
+  const modelLbl = document.createElement('span');
+  modelLbl.style.cssText = 'font-size:0.8rem;font-weight:700;color:var(--accent);';
+  modelLbl.textContent = run.modelName;
+  el.appendChild(modelLbl);
+
+  if (isNewBest) {
+    const star = document.createElement('span');
+    star.textContent = '★ New best!';
+    star.style.cssText = 'color:var(--train);font-weight:700;font-size:0.8rem;';
+    el.appendChild(star);
+  }
+
+  const data = document.createElement('span');
+  data.className = 'run-data';
+  data.textContent = run.splitPt + '/' + (TOTAL - run.splitPt) + ' split';
+  el.appendChild(data);
+
+  const right = document.createElement('div');
+  right.className = 'run-right';
+
+  if (run.testAcc !== null) {
+    // Show "train%→" prefix then test bar + score in test colour
+    const prefix = document.createElement('span');
+    prefix.style.cssText = 'font-size:0.75rem;color:var(--muted);white-space:nowrap;';
+    prefix.textContent = Math.round(run.trainAcc * 100) + '%→';
+    right.appendChild(prefix);
+
+    const barBg = document.createElement('div');
+    barBg.className = 'run-mini-bar-bg';
+    const bar = document.createElement('div');
+    bar.className = 'run-mini-bar';
+    bar.style.cssText = 'width:' + Math.round(run.testAcc * 100) + '%;background:var(--test);';
+    barBg.appendChild(bar);
+    right.appendChild(barBg);
+
+    const score = document.createElement('span');
+    score.className = 'run-score';
+    score.style.color = 'var(--test)';
+    score.textContent = Math.round(run.testAcc * 100) + '%';
+    right.appendChild(score);
+  } else {
+    const barBg = document.createElement('div');
+    barBg.className = 'run-mini-bar-bg';
+    const bar = document.createElement('div');
+    bar.className = 'run-mini-bar';
+    bar.style.width = Math.round(run.trainAcc * 100) + '%';
+    barBg.appendChild(bar);
+    right.appendChild(barBg);
+
+    const score = document.createElement('span');
+    score.className = 'run-score';
+    score.textContent = Math.round(run.trainAcc * 100) + '%';
+    right.appendChild(score);
+  }
+
+  el.appendChild(right);
+  return el;
+}
+
 function confirmStartOver() {
   if (!confirm('Start Level 2 over with a fresh dataset?\nAll progress in this level will be reset.')) return;
   startOver();
@@ -661,6 +780,7 @@ function confirmStartOver() {
 function startOver() {
   splitPt = 96; selModel = 0; deployMdl = 0;
   peekCount = 0; busy = false; deployed = false; checkinVal = null;
+  l2Runs = []; l2RunCnt = 0;
   mSt.forEach(m => { m.trained=false; m.tuneCount=0; m.trainAcc=null; m.testAcc=null; m.tested=false; });
 
   State.setLevel(2, { started: false, completed: false, testPeekCount: 0 });
@@ -671,6 +791,8 @@ function startOver() {
   updateCounts();
   renderModelBtns();
 
+  document.getElementById('history-panel').style.display   = 'none';
+  document.getElementById('history-list').innerHTML        = '';
   document.getElementById('accuracy-panel').style.display  = 'none';
   document.getElementById('test-acc-row').style.display    = 'none';
   document.getElementById('progress-panel').style.display  = 'none';
