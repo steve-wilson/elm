@@ -182,8 +182,9 @@
   Log.event('level_start', { level: 1 });
 
   // ── Constants & session state ─────────────────────────────────────────
-  const TOTAL         = 120;
-  const FIRST_RUN_CAP = 50;
+  const TOTAL              = 120;
+  const FIRST_RUN_CAP      = 50;
+  const ACCURACY_THRESHOLD = 85; // % needed to unlock models
 
   const MODEL_SETS = {
     greek:     ['α','β','γ','δ','ε','ζ'],
@@ -208,7 +209,8 @@
   let selected        = new Set();
   let dragging        = false;
   let dragMode        = null;
-  let onboardPhase    = 0; // 0=first-run cap, 1=nudge more data, 2=chase 90%, 3=model explore
+  let onboardPhase    = 0; // 0=first-run cap, 1=nudge more data, 2=chase ACCURACY_THRESHOLD, 3=model explore
+  let phase2Tries     = 0; // how many times trained in phase 2 without hitting threshold
   let training        = false;
   let allRuns         = [];
 
@@ -496,17 +498,26 @@
         text.innerHTML = `Not bad! But notice that accuracy — now try selecting <strong>more data</strong> and training again to see what happens.`;
 
       } else if (onboardPhase === 1) {
-        if (pct >= 90) {
+        if (pct >= ACCURACY_THRESHOLD) {
           advanceToModelPhase();
         } else {
           onboardPhase = 2;
           banner.style.display     = 'flex';
           banner.style.borderColor = 'var(--accent)';
-          text.innerHTML = `Great work! See if you can get <strong>more than 90% accuracy</strong> — try more data or run again.`;
+          text.innerHTML = `Getting there! See if you can hit <strong>${ACCURACY_THRESHOLD}%</strong> — try adding even more blocks and training again.`;
         }
 
       } else if (onboardPhase === 2) {
-        if (pct >= 90) advanceToModelPhase();
+        if (pct >= ACCURACY_THRESHOLD) {
+          advanceToModelPhase();
+        } else {
+          phase2Tries++;
+          if (phase2Tries >= 3) {
+            banner.style.display     = 'flex';
+            banner.style.borderColor = 'var(--accent)';
+            text.innerHTML = `Still under ${ACCURACY_THRESHOLD}%? Try selecting <strong>as many blocks as you can</strong> — the more training data, the better.`;
+          }
+        }
 
       } else if (onboardPhase === 3) {
         modelsTried.add(selectedModel);
