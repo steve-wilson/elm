@@ -11,15 +11,688 @@
   } catch(e) {}
 </script>
 <link rel="stylesheet" href="css/shared.css">
+<style>
+.split-container {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
+}
+.split-row {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+}
+.split-lbl { font-size: 0.82rem; font-weight: 700; }
+.lbl-train { color: var(--train); }
+.lbl-test  { color: var(--test); }
+.split-ct  { font-size: 0.78rem; color: var(--muted); font-weight: 400; margin-left: 4px; }
+#split-slider { width: 100%; margin: 8px 0; accent-color: var(--accent); cursor: pointer; }
+.split-hint { text-align: center; font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+
+#guide-banner {
+  border: 1px solid var(--accent); border-radius: var(--radius);
+  padding: 12px 16px; margin-bottom: 16px; font-size: 0.9rem; line-height: 1.5;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+
+.model-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+#peek-counter {
+  display: none; padding: 5px 13px; border-radius: 20px; font-size: 0.82rem;
+  font-weight: 600; border: 1px solid var(--border); color: var(--muted);
+  margin-left: auto; white-space: nowrap;
+}
+#peek-counter.peek-warn   { border-color: #f59e0b; color: #b45309; background: color-mix(in srgb, #f59e0b 12%, var(--surface)); }
+#peek-counter.peek-danger { border-color: #ef4444; color: #b91c1c; background: color-mix(in srgb, #ef4444 12%, var(--surface)); }
+
+#progress-panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 20px; margin-top: 12px; display: none;
+}
+.prog-bg { margin-top: 8px; background: var(--border); border-radius: 6px; overflow: hidden; height: 12px; }
+#prog-fill { height: 100%; background: var(--train); border-radius: 6px; width: 0%; transition: width 0.1s linear; }
+
+#deploy-section {
+  display: none; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px; margin-top: 16px;
+}
+.deploy-stream {
+  display: grid; grid-template-columns: repeat(15, 1fr); gap: 3px; margin: 14px 0;
+}
+.dot { aspect-ratio: 1; border-radius: 50%; background: var(--border); transition: background 0.15s; }
+.dot.correct { background: var(--train); }
+.dot.wrong   { background: var(--test); }
+
+.deploy-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+.cmp-card {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px; text-align: center;
+}
+.cmp-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 6px; }
+.cmp-val   { font-size: 1.8rem; font-weight: 800; }
+.val-good  { color: var(--train); }
+.val-bad   { color: var(--test); }
+
+.outcome-msg { margin-top: 14px; padding: 12px 16px; border-radius: var(--radius); font-size: 0.88rem; line-height: 1.6; }
+.msg-ok  { border: 1px solid var(--train); background: color-mix(in srgb, var(--train) 10%, var(--surface)); }
+.msg-bad { border: 1px solid var(--test);  background: color-mix(in srgb, var(--test)  10%, var(--surface)); }
+
+#checkin-section {
+  display: none; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px; margin-top: 16px; text-align: center;
+}
+.checkin-row { display: flex; gap: 10px; justify-content: center; margin: 12px 0; flex-wrap: wrap; }
+.ci-btn {
+  padding: 9px 18px; border: 2px solid var(--border); border-radius: var(--radius);
+  background: var(--bg); color: var(--text); cursor: pointer;
+  font-family: var(--font); font-size: 0.9rem; font-weight: 600; transition: all 0.15s;
+}
+.ci-btn:hover  { border-color: var(--accent); }
+.ci-btn.active { border-color: var(--accent); background: var(--accent); color: white; }
+#ci-text {
+  width: 100%; max-width: 440px; padding: 8px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--bg); color: var(--text); font-family: var(--font);
+  font-size: 0.85rem; resize: vertical; min-height: 56px;
+}
+
+#next-section {
+  display: none; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 24px 20px; margin-top: 16px; text-align: center;
+}
+#next-section p { color: var(--muted); font-size: 0.9rem; line-height: 1.6; max-width: 500px; margin: 0 auto 18px; }
+
+@media (max-width: 480px) {
+  .deploy-stream  { grid-template-columns: repeat(10, 1fr); }
+  .cmp-val        { font-size: 1.4rem; }
+}
+</style>
 </head>
 <body>
-<div class="placeholder-page">
-  <h1>Level 2</h1>
-  <p>Train/Test splits — coming soon.</p>
-  <a href="level1.html" style="color:var(--accent);">← Back to Level 1</a>
+
+<!-- Theme overlay -->
+<div class="overlay" id="theme-overlay" style="display:none;">
+  <div class="picker-card">
+    <h1>Pick your theme</h1>
+    <p>You can change this any time from the header.</p>
+    <div class="picker-options">
+      <button class="picker-btn" onclick="pickTheme('clean')"><div class="swatch swatch-clean"></div>Clean</button>
+      <button class="picker-btn" onclick="pickTheme('dark')"><div class="swatch swatch-dark"></div>Dark</button>
+      <button class="picker-btn" onclick="pickTheme('retro')"><div class="swatch swatch-retro"></div>Retro</button>
+      <button class="picker-btn" onclick="pickTheme('candy')"><div class="swatch swatch-candy"></div>Candy</button>
+    </div>
+  </div>
 </div>
+
+<!-- Model set overlay -->
+<div class="overlay" id="model-overlay" style="display:none;">
+  <div class="picker-card">
+    <h1>Choose model names</h1>
+    <p>You can switch this any time from the header.</p>
+    <div class="picker-options">
+      <button class="picker-btn" onclick="pickModelSet('greek')"><div style="font-size:1.1rem;margin-bottom:4px;">α β γ δ ε ζ</div>Greek letters</button>
+      <button class="picker-btn" onclick="pickModelSet('animals')"><div style="font-size:1.1rem;margin-bottom:4px;">🦊🐺🐻🦅🦈🐯</div>Animals</button>
+      <button class="picker-btn" onclick="pickModelSet('zodiac')"><div style="font-size:1.1rem;margin-bottom:4px;">♈♉♊♋♌♍</div>Zodiac</button>
+      <button class="picker-btn" onclick="pickModelSet('realistic')"><div style="font-size:0.78rem;font-weight:700;margin-bottom:4px;">SVM · RF · GB · NN</div>Real names</button>
+    </div>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <h1>Split or Regret</h1>
+      <span class="level-badge">Level 2</span>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="header-btn" id="models-btn" onclick="showModelPicker()" style="display:none;">Models</button>
+      <button class="header-btn" onclick="confirmStartOver()">↺ Restart</button>
+      <button class="header-btn" onclick="showThemePicker()">Theme</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="guide-banner">
+      ✂️ <strong>Now you can split your data.</strong> Drag the slider to decide where training ends and the test set begins. Train a model, then check how it does on held-out data — but pay attention to how many times you peek!
+    </div>
+
+    <!-- Grid + slider -->
+    <div class="split-container">
+      <div class="split-row">
+        <span class="split-lbl lbl-train">Train <span class="split-ct" id="train-ct"></span></span>
+        <span class="split-lbl lbl-test">Test <span class="split-ct" id="test-ct"></span></span>
+      </div>
+      <input type="range" id="split-slider" min="10" max="110" value="96">
+      <div id="data-grid" style="pointer-events:none;"></div>
+      <div class="split-hint">Drag to adjust the train / test split</div>
+    </div>
+
+    <!-- Model panel -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:16px;">
+      <div class="section-label">Choose a model</div>
+      <div class="model-row" id="model-buttons"></div>
+    </div>
+
+    <!-- Controls -->
+    <div id="controls">
+      <button class="btn btn-train" id="train-btn" onclick="doTrain()">▶ Train</button>
+      <button class="btn btn-secondary" id="tune-btn" onclick="doTune()" disabled>⚙ Tune</button>
+      <button class="btn btn-secondary" id="test-btn" onclick="doCheckTest()" disabled>🔍 Check Test</button>
+      <div id="peek-counter">👁 <span id="peek-num">0</span> peek<span id="peek-s">s</span></div>
+    </div>
+
+    <!-- Progress -->
+    <div id="progress-panel">
+      <div class="section-label" id="prog-label">Training…</div>
+      <div class="prog-bg"><div id="prog-fill"></div></div>
+      <div id="prog-text" style="margin-top:6px;font-size:0.82rem;color:var(--muted);"></div>
+    </div>
+
+    <!-- Accuracy -->
+    <div id="accuracy-panel">
+      <div class="section-label">Model performance</div>
+      <div class="accuracy-row">
+        <div class="accuracy-label">Train accuracy</div>
+        <div class="accuracy-bar-bg"><div class="accuracy-bar" id="train-bar" style="width:0%"></div></div>
+        <div class="accuracy-pct" id="train-pct">—</div>
+      </div>
+      <div class="accuracy-row" id="test-acc-row" style="display:none;">
+        <div class="accuracy-label" style="color:var(--test);">Test accuracy</div>
+        <div class="accuracy-bar-bg"><div class="accuracy-bar" id="test-bar" style="width:0%;background:var(--test);"></div></div>
+        <div class="accuracy-pct" id="test-pct">—</div>
+      </div>
+    </div>
+
+    <!-- Deploy -->
+    <div id="deploy-section">
+      <div class="section-label" style="margin-bottom:12px;">🚀 Deploy a model</div>
+      <p style="font-size:0.88rem;color:var(--muted);margin-bottom:12px;">Select which model to ship. Real users will start arriving immediately.</p>
+      <div class="model-row" id="deploy-buttons"></div>
+      <button class="btn btn-train" id="deploy-btn" onclick="doDeploy()" style="margin-top:14px;">🚀 Deploy</button>
+      <div class="deploy-stream" id="deploy-stream" style="display:none;"></div>
+      <div class="deploy-compare" id="deploy-compare" style="display:none;">
+        <div class="cmp-card">
+          <div class="cmp-label">Your test accuracy</div>
+          <div class="cmp-val" id="cmp-test">—</div>
+        </div>
+        <div class="cmp-card">
+          <div class="cmp-label">Real-world accuracy</div>
+          <div class="cmp-val" id="cmp-real">—</div>
+        </div>
+      </div>
+      <div id="outcome-msg" style="display:none;"></div>
+    </div>
+
+    <!-- Check-in -->
+    <div id="checkin-section">
+      <h3 style="font-size:1rem;font-weight:700;margin-bottom:4px;">How's it going?</h3>
+      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:4px;">Quick check-in — totally optional.</p>
+      <div class="checkin-row">
+        <button class="ci-btn" onclick="selectCheckin(this,'great')">😊 Great</button>
+        <button class="ci-btn" onclick="selectCheckin(this,'okay')">😐 Okay</button>
+        <button class="ci-btn" onclick="selectCheckin(this,'struggling')">😓 Struggling</button>
+      </div>
+      <textarea id="ci-text" placeholder="Any feedback to help improve this? (optional)"></textarea>
+      <div style="margin-top:12px;">
+        <button class="btn btn-secondary" onclick="submitCheckin()" style="font-size:0.85rem;">Submit feedback</button>
+      </div>
+    </div>
+
+    <!-- Next stage -->
+    <div id="next-section">
+      <p>You've seen how peeking at the test set contaminates your accuracy estimate — even when you're only making small decisions. In Level 3, you'll add a <strong>validation set</strong> so you can iterate freely while keeping the test set truly untouched.</p>
+      <button class="btn btn-next-stage" onclick="goNextStage()">Level 3: Add a Validation Set →</button>
+    </div>
+  </main>
+</div>
+
 <script src="js/state.js"></script>
+<script src="js/log.js"></script>
 <script src="js/themes.js"></script>
-<script>Themes.fromState();</script>
+<script>
+const TOTAL = 120;
+
+const MODEL_SETS = {
+  greek:     ['α','β','γ','δ','ε','ζ'],
+  animals:   ['🦊','🐺','🐻','🦅','🦈','🐯'],
+  zodiac:    ['♈','♉','♊','♋','♌','♍'],
+  realistic: ['SVM','RandForest','GradBoost','NeuralNet','KNN','NaiveBayes'],
+};
+
+const CURVES = [
+  {base:0.52, scale:0.40, jitter:0.04, overfit:0.08},
+  {base:0.44, scale:0.52, jitter:0.04, overfit:0.12},
+  {base:0.63, scale:0.26, jitter:0.02, overfit:0.05},
+  {base:0.50, scale:0.38, jitter:0.12, overfit:0.10},
+  {base:0.40, scale:0.57, jitter:0.04, overfit:0.14},
+  {base:0.56, scale:0.36, jitter:0.03, overfit:0.07},
+];
+
+let splitPt     = 96;
+let selModel    = 0;
+let deployMdl   = 0;
+let peekCount   = 0;
+let busy        = false;
+let deployed    = false;
+let checkinVal  = null;
+
+const mSt = CURVES.map(() => ({ trained:false, tuneCount:0, trainAcc:null, testAcc:null, tested:false }));
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+Themes.fromState();
+
+if (!State.get('theme')) {
+  document.getElementById('theme-overlay').style.display = 'flex';
+}
+if (State.get('modelSet')) {
+  document.getElementById('models-btn').style.display = '';
+}
+
+const lvl2saved = State.getLevel(2) || {};
+peekCount = lvl2saved.testPeekCount || 0;
+
+renderGrid();
+updateCounts();
+renderModelBtns();
+if (peekCount > 0) renderPeek();
+
+document.getElementById('split-slider').addEventListener('input', function() {
+  splitPt = +this.value;
+  renderGrid();
+  updateCounts();
+  mSt.forEach(m => { m.tested = false; });
+  document.getElementById('test-acc-row').style.display = 'none';
+  updateBanner();
+});
+
+// ── Grid ──────────────────────────────────────────────────────────────────────
+function renderGrid() {
+  const g = document.getElementById('data-grid');
+  g.innerHTML = '';
+  for (let i = 0; i < TOTAL; i++) {
+    const b = document.createElement('div');
+    b.className = 'block ' + (i < splitPt ? 'train' : 'test');
+    g.appendChild(b);
+  }
+}
+
+function updateCounts() {
+  document.getElementById('train-ct').textContent = '(' + splitPt + ')';
+  document.getElementById('test-ct').textContent  = '(' + (TOTAL - splitPt) + ')';
+}
+
+// ── Model buttons ─────────────────────────────────────────────────────────────
+function getLabels() { return MODEL_SETS[State.get('modelSet') || 'greek']; }
+
+function renderModelBtns() {
+  const labels = getLabels();
+  const c = document.getElementById('model-buttons');
+  c.innerHTML = '';
+  labels.forEach((lbl, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'model-btn' + (i === selModel ? ' active' : '') + (mSt[i].trained ? ' tried' : '');
+    btn.textContent = lbl;
+    btn.onclick = () => selectModel(i);
+    c.appendChild(btn);
+  });
+}
+
+function selectModel(i) {
+  selModel = i;
+  renderModelBtns();
+  const ms = mSt[i];
+  if (ms.trained) {
+    document.getElementById('accuracy-panel').style.display = 'block';
+    setBar('train-bar', 'train-pct', ms.trainAcc);
+    if (ms.tested) {
+      document.getElementById('test-acc-row').style.display = 'flex';
+      setBar('test-bar', 'test-pct', ms.testAcc);
+    } else {
+      document.getElementById('test-acc-row').style.display = 'none';
+    }
+  } else {
+    document.getElementById('accuracy-panel').style.display = 'none';
+  }
+  document.getElementById('tune-btn').disabled = !ms.trained || busy;
+  document.getElementById('tune-btn').textContent = ms.tuneCount > 0 ? '⚙ Tune (×' + ms.tuneCount + ')' : '⚙ Tune';
+  document.getElementById('test-btn').disabled = !ms.trained || busy;
+}
+
+function renderDeployBtns() {
+  const labels = getLabels();
+  const c = document.getElementById('deploy-buttons');
+  c.innerHTML = '';
+  labels.forEach((lbl, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'model-btn' + (i === deployMdl ? ' active' : '') + (mSt[i].tested ? ' tried' : '');
+    btn.textContent = lbl;
+    btn.onclick = () => { deployMdl = i; renderDeployBtns(); };
+    c.appendChild(btn);
+  });
+}
+
+// ── Train ─────────────────────────────────────────────────────────────────────
+function doTrain() {
+  if (busy) return;
+  busy = true;
+  setCtrlsEnabled(false);
+
+  const ms    = mSt[selModel];
+  const ratio = splitPt / TOTAL;
+  const curve = CURVES[selModel];
+
+  showProg('Training…');
+  runProg(Math.max(800, ratio * 5000), splitPt, 'Training on example', () => {
+    ms.trainAcc  = clamp(curve.base + ratio * curve.scale + curve.jitter * (Math.random() - 0.5), 0.30, 0.98);
+    ms.trained   = true;
+    ms.tuneCount = 0;
+    ms.tested    = false;
+    ms.testAcc   = null;
+
+    hideProg();
+    document.getElementById('accuracy-panel').style.display = 'block';
+    setBar('train-bar', 'train-pct', ms.trainAcc);
+    document.getElementById('test-acc-row').style.display = 'none';
+    document.getElementById('tune-btn').textContent = '⚙ Tune';
+    renderModelBtns();
+    Log.event('l2_train', { model: selModel, splitPt, trainAcc: ms.trainAcc });
+    State.setLevel(2, { started: true });
+    updateBanner();
+    setCtrlsEnabled(true);
+    busy = false;
+  });
+}
+
+// ── Tune ──────────────────────────────────────────────────────────────────────
+function doTune() {
+  if (busy || !mSt[selModel].trained) return;
+  busy = true;
+  setCtrlsEnabled(false);
+
+  const ms    = mSt[selModel];
+  const ratio = splitPt / TOTAL;
+
+  showProg('Tuning hyperparameters…');
+  runProg(Math.max(500, ratio * 2000), splitPt, 'Optimizing step', () => {
+    ms.tuneCount++;
+    // Diminishing train gains with each tune round
+    const boost = 0.015 * Math.exp(-ms.tuneCount * 0.25) + 0.005 * Math.random();
+    ms.trainAcc = clamp(ms.trainAcc + boost, 0.30, 0.995);
+    ms.tested   = false;
+    ms.testAcc  = null;
+
+    hideProg();
+    setBar('train-bar', 'train-pct', ms.trainAcc);
+    document.getElementById('test-acc-row').style.display = 'none';
+    document.getElementById('tune-btn').textContent = '⚙ Tune (×' + ms.tuneCount + ')';
+    Log.event('l2_tune', { model: selModel, tuneCount: ms.tuneCount, trainAcc: ms.trainAcc });
+    updateBanner();
+    setCtrlsEnabled(true);
+    busy = false;
+  });
+}
+
+// ── Check Test ────────────────────────────────────────────────────────────────
+function doCheckTest() {
+  if (busy || !mSt[selModel].trained) return;
+
+  const ms    = mSt[selModel];
+  const curve = CURVES[selModel];
+  const testR = 1 - splitPt / TOTAL;
+  // Parabola: gap is smallest around tune 2, grows before and after
+  // (early tuning finds better hyperparams; late tuning overfits to train quirks)
+  const peakTune = 2;
+  const tuneFactor = Math.max(0.35, 0.35 + Math.pow(ms.tuneCount - peakTune, 2) * 0.10);
+  const gap = curve.overfit * tuneFactor * (1 + testR * 0.6);
+
+  ms.testAcc = clamp(ms.trainAcc - gap + 0.02 * (Math.random() - 0.5), 0.25, 0.96);
+  ms.tested  = true;
+  peekCount++;
+  State.setLevel(2, { testPeekCount: peekCount });
+
+  document.getElementById('test-acc-row').style.display = 'flex';
+  setBar('test-bar', 'test-pct', ms.testAcc);
+  renderPeek();
+
+  const deployEl = document.getElementById('deploy-section');
+  if (deployEl.style.display === 'none') {
+    deployMdl = selModel;
+    deployEl.style.display = 'block';
+    renderDeployBtns();
+    deployEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } else {
+    renderDeployBtns();
+  }
+
+  Log.event('l2_check_test', { model: selModel, peekCount, testAcc: ms.testAcc });
+  updateBanner();
+}
+
+// ── Peek counter ──────────────────────────────────────────────────────────────
+function renderPeek() {
+  const el = document.getElementById('peek-counter');
+  el.style.display = 'block';
+  document.getElementById('peek-num').textContent = peekCount;
+  document.getElementById('peek-s').textContent   = peekCount === 1 ? '' : 's';
+  el.className = peekCount >= 4 ? 'peek-danger' : peekCount >= 2 ? 'peek-warn' : '';
+}
+
+// ── Deploy ────────────────────────────────────────────────────────────────────
+function doDeploy() {
+  if (busy || deployed) return;
+  busy = true;
+  document.getElementById('deploy-btn').disabled = true;
+  document.getElementById('deploy-btn').textContent = 'Deploying…';
+
+  const ms    = mSt[deployMdl];
+  const curve = CURVES[deployMdl];
+  const baseTest = ms.tested  ? ms.testAcc
+                 : ms.trained ? clamp(ms.trainAcc - curve.overfit, 0.25, 0.95)
+                 : 0.50;
+
+  const contamination = Math.max(0, peekCount - 1) * 0.028;
+  const realAcc = clamp(baseTest - contamination + 0.015 * (Math.random() - 0.5), 0.25, 0.95);
+
+  const streamEl = document.getElementById('deploy-stream');
+  streamEl.style.display = 'grid';
+  streamEl.innerHTML = '';
+  const dots = Array.from({length: 30}, () => {
+    const d = document.createElement('div');
+    d.className = 'dot';
+    streamEl.appendChild(d);
+    return d;
+  });
+
+  let correct = 0, i = 0;
+  const tick = setInterval(() => {
+    if (i === 30) {
+      clearInterval(tick);
+      finalizeDeploy(baseTest, correct / 30, contamination);
+      return;
+    }
+    const hit = Math.random() < realAcc;
+    if (hit) correct++;
+    dots[i].className = 'dot ' + (hit ? 'correct' : 'wrong');
+    i++;
+  }, 110);
+}
+
+function finalizeDeploy(testEst, realAcc, contamination) {
+  document.getElementById('deploy-compare').style.display = 'grid';
+  document.getElementById('cmp-test').textContent = fmtPct(testEst);
+  document.getElementById('cmp-real').textContent = fmtPct(realAcc);
+  document.getElementById('cmp-real').className   = 'cmp-val ' + (realAcc >= testEst - 0.05 ? 'val-good' : 'val-bad');
+
+  const gap = Math.round((testEst - realAcc) * 100);
+  const msg = document.getElementById('outcome-msg');
+  msg.style.display = 'block';
+
+  if (peekCount <= 1) {
+    msg.className = 'outcome-msg msg-ok';
+    msg.innerHTML = `✅ <strong>Clean estimate.</strong> You checked the test set ${peekCount === 0 ? 'zero' : 'just once'}, so it remained a fair benchmark. Notice how close the real-world result is to your test accuracy.`;
+  } else if (gap <= 2) {
+    msg.className = 'outcome-msg msg-ok';
+    msg.innerHTML = `⚠️ <strong>You got lucky.</strong> You peeked ${peekCount} times — which typically inflates your test accuracy estimate — but the noise happened to go your way. Try again after even more peeks to see the gap grow.`;
+  } else {
+    msg.className = 'outcome-msg msg-bad';
+    msg.innerHTML = `🔴 <strong>Contamination gap: ${gap}%.</strong> You peeked at the test set ${peekCount} time${peekCount > 1 ? 's' : ''}. Each time, the results influenced a decision — which model to pick, whether to tune more, where to draw the split. The test set absorbed those choices and could no longer give you an unbiased estimate of real-world performance.`;
+  }
+
+  State.setLevel(2, { completed: true, bestAccuracy: realAcc });
+  Log.event('l2_deploy', { deployMdl, peekCount, testEst, realAcc, contamination });
+
+  deployed = true;
+  busy = false;
+  updateBanner();
+
+  setTimeout(() => {
+    document.getElementById('checkin-section').style.display = 'block';
+    document.getElementById('next-section').style.display = 'block';
+    document.getElementById('checkin-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, 700);
+}
+
+// ── Check-in ──────────────────────────────────────────────────────────────────
+function selectCheckin(btn, val) {
+  checkinVal = val;
+  document.querySelectorAll('.ci-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function submitCheckin() {
+  const txt = document.getElementById('ci-text').value.trim();
+  if (checkinVal || txt) Log.event('l2_checkin', { rating: checkinVal, feedback: txt });
+  document.getElementById('checkin-section').style.display = 'none';
+  document.getElementById('next-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ── Next stage ────────────────────────────────────────────────────────────────
+function goNextStage() {
+  Log.event('l2_complete', { peekCount });
+  window.location.href = 'level3.html';
+}
+
+// ── Theme / model pickers ─────────────────────────────────────────────────────
+function showThemePicker() { document.getElementById('theme-overlay').style.display = 'flex'; }
+function pickTheme(name) {
+  State.set('theme', name);
+  Themes.apply(name);
+  document.getElementById('theme-overlay').style.display = 'none';
+}
+
+function showModelPicker() { document.getElementById('model-overlay').style.display = 'flex'; }
+function pickModelSet(name) {
+  State.set('modelSet', name);
+  document.getElementById('models-btn').style.display = '';
+  document.getElementById('model-overlay').style.display = 'none';
+  renderModelBtns();
+  if (document.getElementById('deploy-section').style.display !== 'none') renderDeployBtns();
+}
+
+// ── Guide banner ──────────────────────────────────────────────────────────────
+function updateBanner() {
+  const el          = document.getElementById('guide-banner');
+  const anyTrained  = mSt.some(m => m.trained);
+  const anyTested   = mSt.some(m => m.tested);
+  const curTunes    = mSt[selModel].tuneCount;
+  const highTune    = mSt[selModel].trained && curTunes >= 4;
+
+  if (deployed) {
+    el.innerHTML = `🎓 <strong>Level 2 complete.</strong> You experienced how peeking at test results — even lightly — contaminates your accuracy estimate. Scroll down to head to Level 3.`;
+  } else if (peekCount >= 3) {
+    el.innerHTML = `⚠️ <strong>You've peeked ${peekCount} times.</strong> Each peek let test results influence a decision. When you deploy, watch how much that shows up in the real-world result.`;
+  } else if (highTune) {
+    el.innerHTML = `🔴 <strong>Tuned ${curTunes} times.</strong> Train accuracy keeps climbing — but at some point, excessive tuning causes the model to memorize training quirks rather than learn real patterns. Check your test accuracy to see the effect.`;
+  } else if (anyTested) {
+    el.innerHTML = `👁 <strong>Test set checked.</strong> You can keep tuning (a couple rounds often helps), switch models, or adjust the split — but every peek counts. Deploy when you're ready.`;
+  } else if (anyTrained) {
+    el.innerHTML = `✅ <strong>Model trained.</strong> Click <strong>Check Test</strong> to see how it does on held-out data — or try tuning it first. A round or two of tuning often improves test accuracy too.`;
+  } else {
+    el.innerHTML = `✂️ <strong>Now you can split your data.</strong> Drag the slider to decide where training ends and the test set begins. Train a model, then check how it does on held-out data — but pay attention to how many times you peek!`;
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function clamp(v, lo, hi)  { return Math.min(hi, Math.max(lo, v)); }
+function fmtPct(v)          { return (v * 100).toFixed(1) + '%'; }
+
+function setBar(barId, pctId, val) {
+  document.getElementById(barId).style.width  = fmtPct(val);
+  document.getElementById(pctId).textContent  = fmtPct(val);
+}
+
+function setCtrlsEnabled(on) {
+  const ms = mSt[selModel];
+  document.getElementById('train-btn').disabled = !on;
+  document.getElementById('tune-btn').disabled  = !on || !ms.trained;
+  document.getElementById('test-btn').disabled  = !on || !ms.trained;
+}
+
+function showProg(label) {
+  document.getElementById('prog-label').textContent = label;
+  document.getElementById('prog-fill').style.width  = '0%';
+  document.getElementById('prog-text').textContent  = '';
+  document.getElementById('progress-panel').style.display = 'block';
+}
+
+function hideProg() {
+  document.getElementById('progress-panel').style.display = 'none';
+}
+
+function runProg(duration, total, verb, onDone) {
+  const t0 = performance.now();
+  let lastStep = -1;
+  (function frame(now) {
+    const p = Math.min((now - t0) / duration, 1);
+    const e = 1 - Math.pow(1 - p, 2);
+    const step = Math.round(e * total);
+    document.getElementById('prog-fill').style.width = (e * 100).toFixed(1) + '%';
+    if (step !== lastStep) {
+      document.getElementById('prog-text').textContent = verb + ' ' + step + '/' + total;
+      lastStep = step;
+    }
+    if (p < 1) requestAnimationFrame(frame);
+    else setTimeout(onDone, 150);
+  })(performance.now());
+}
+
+function confirmStartOver() {
+  if (!confirm('Start Level 2 over with a fresh dataset?\nAll progress in this level will be reset.')) return;
+  startOver();
+}
+
+function startOver() {
+  splitPt = 96; selModel = 0; deployMdl = 0;
+  peekCount = 0; busy = false; deployed = false; checkinVal = null;
+  mSt.forEach(m => { m.trained=false; m.tuneCount=0; m.trainAcc=null; m.testAcc=null; m.tested=false; });
+
+  State.setLevel(2, { started: false, completed: false, testPeekCount: 0 });
+  Log.event('l2_restart', {});
+
+  document.getElementById('split-slider').value = 96;
+  renderGrid();
+  updateCounts();
+  renderModelBtns();
+
+  document.getElementById('accuracy-panel').style.display  = 'none';
+  document.getElementById('test-acc-row').style.display    = 'none';
+  document.getElementById('progress-panel').style.display  = 'none';
+  document.getElementById('deploy-section').style.display  = 'none';
+  document.getElementById('deploy-stream').style.display   = 'none';
+  document.getElementById('deploy-stream').innerHTML       = '';
+  document.getElementById('deploy-compare').style.display  = 'none';
+  document.getElementById('outcome-msg').style.display     = 'none';
+  document.getElementById('checkin-section').style.display = 'none';
+  document.getElementById('next-section').style.display    = 'none';
+  document.getElementById('peek-counter').style.display    = 'none';
+
+  const db = document.getElementById('deploy-btn');
+  db.disabled = false; db.textContent = '🚀 Deploy';
+  document.getElementById('train-btn').disabled    = false;
+  document.getElementById('tune-btn').disabled     = true;
+  document.getElementById('tune-btn').textContent  = '⚙ Tune';
+  document.getElementById('test-btn').disabled     = true;
+
+  updateBanner();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
 </body>
 </html>

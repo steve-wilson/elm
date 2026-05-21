@@ -12,6 +12,13 @@
   } catch(e) {}
 </script>
 <link rel="stylesheet" href="css/shared.css">
+<style>
+.deploy-dot { aspect-ratio:1; border-radius:50%; background:var(--border); transition:background 0.15s; }
+.deploy-dot.correct { background:var(--train); }
+.deploy-dot.wrong   { background:var(--test); }
+.deploy-stream { display:grid; grid-template-columns:repeat(15,1fr); gap:3px; margin:14px 0; }
+@media (max-width:480px) { .deploy-stream { grid-template-columns:repeat(10,1fr); } }
+</style>
 </head>
 <body>
 
@@ -80,7 +87,7 @@
     <div id="guide-banner" style="background:var(--surface);border:1px solid var(--accent);border-radius:var(--radius);padding:14px 18px;margin-bottom:14px;display:flex;align-items:flex-start;gap:12px;">
       <span style="font-size:1.2rem;line-height:1;">👆</span>
       <span id="guide-text" style="font-size:0.9rem;line-height:1.5;color:var(--text);">
-        Select a small handful of data blocks, then click <strong>Train</strong> to see how your model does.
+        Each block is a training example — a sentence, an image, or a data point a model can learn from. Select a small handful, then click <strong>Train</strong>.
       </span>
     </div>
 
@@ -127,8 +134,40 @@
       </div>
     </div>
 
-    <div id="next-stage-container" style="display:none;margin-top:24px;text-align:center;">
-      <button class="btn btn-next-stage" onclick="goNextStage()">Next Stage →</button>
+    <!-- Deploy section: appears after all 6 models tried -->
+    <div id="deploy-section" style="display:none;margin-top:24px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
+        <div class="section-label" style="margin-bottom:12px;">🚀 Deploy your model</div>
+        <p style="font-size:0.88rem;color:var(--muted);margin-bottom:14px;">
+          You've trained all 6 models. Now pick one to ship — and see how it performs on data it's never seen before.
+        </p>
+        <div id="deploy-model-row" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+        <button class="btn btn-train" id="deploy-btn" onclick="doL1Deploy()" style="margin-top:14px;">🚀 Deploy</button>
+        <div id="l1-stream" class="deploy-stream" style="display:none;"></div>
+        <div id="l1-results" style="display:none;margin-top:4px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;">
+              <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:6px;">Your training accuracy</div>
+              <div id="l1-cmp-train" style="font-size:1.8rem;font-weight:800;color:var(--train);">—</div>
+            </div>
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;">
+              <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:6px;">Real-world accuracy</div>
+              <div id="l1-cmp-real" style="font-size:1.8rem;font-weight:800;">—</div>
+            </div>
+          </div>
+          <div id="l1-reveal-msg" style="display:none;margin-top:14px;padding:14px 16px;border-radius:var(--radius);line-height:1.6;font-size:0.9rem;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Next stage: appears after deploy -->
+    <div id="next-stage-container" style="display:none;margin-top:16px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;text-align:center;">
+        <p style="color:var(--muted);font-size:0.9rem;line-height:1.6;max-width:520px;margin:0 auto 16px;">
+          <strong>Level 2 is a completely fresh start</strong> — a new dataset, a new problem, and a new set of models. Your task: learn to hold back a test set before training, so you have a reliable estimate before you deploy.
+        </p>
+        <button class="btn btn-next-stage" onclick="goNextStage()">Level 2: A New Dataset →</button>
+      </div>
     </div>
   </main>
 </div>
@@ -474,12 +513,9 @@
         State.setLevel(1, { modelsTried: [...modelsTried] });
         renderModelButtons();
         if (modelsTried.size >= 6) {
-          const nextBtn = document.getElementById('next-stage-container');
-          if (nextBtn.style.display === 'none') {
-            nextBtn.style.display    = 'block';
-            banner.style.display     = 'flex';
-            banner.style.borderColor = 'var(--train)';
-            text.innerHTML = `You've tried all 6 models! Ready to move on — or keep experimenting.`;
+          const deploySection = document.getElementById('deploy-section');
+          if (deploySection.style.display === 'none') {
+            showDeploySection();
             Log.event('all_models_tried', { level: 1 });
           }
         }
@@ -503,6 +539,142 @@
     Themes.apply(t);
     document.getElementById('theme-overlay').style.display = 'none';
     Log.event('theme_change', { theme: t });
+  }
+
+  // ── Deploy (Level 1) ──────────────────────────────────────────────────
+  // Real-world accuracies: deliberately inverted from training rankings.
+  // Training best→worst: 4 > 1 > 0 ≈ 5 > 2 > 3
+  // Real-world best→worst: 2 > 3 > 5 > 0 > 1 > 4
+  // This ensures students always see a rank flip on deploy.
+  const REAL_WORLD_ACCS = [0.70, 0.64, 0.79, 0.75, 0.61, 0.72];
+
+  let deployModelIdx = 0;
+  let l1Deployed     = false;
+
+  function showDeploySection() {
+    deployModelIdx = selectedModel; // default to currently selected
+    const section = document.getElementById('deploy-section');
+    section.style.display = 'block';
+    renderDeployModelBtns();
+
+    const banner = document.getElementById('guide-banner');
+    const text   = document.getElementById('guide-text');
+    banner.style.display      = 'flex';
+    banner.style.borderColor  = 'var(--train)';
+    text.innerHTML = `You've tried all 6 models. Now pick one to <strong>deploy</strong> — and see how it holds up on data it's never seen before.`;
+
+    setTimeout(() => section.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+  }
+
+  function renderDeployModelBtns() {
+    const labels = MODEL_SETS[currentModelSet];
+    const c = document.getElementById('deploy-model-row');
+    c.innerHTML = '';
+    labels.forEach((lbl, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'model-btn' + (i === deployModelIdx ? ' active' : '');
+      btn.textContent = lbl;
+      btn.onclick = () => { deployModelIdx = i; renderDeployModelBtns(); };
+      c.appendChild(btn);
+    });
+  }
+
+  function getRealWorldAccs(deployIdx) {
+    // Add small noise to each model's real-world base accuracy
+    const accs = REAL_WORLD_ACCS.map(a => a + 0.03 * (Math.random() - 0.5));
+
+    // Find the natural real-world winner
+    const bestIdx = accs.reduce((bi, a, i) => a > accs[bi] ? i : bi, 0);
+
+    // If the deployed model would naturally win (user got lucky), shift best to next-best
+    if (bestIdx === deployIdx) {
+      const nextBest = accs.map((a, i) => [a, i])
+                           .filter(([, i]) => i !== deployIdx)
+                           .sort(([a], [b]) => b - a)[0][1];
+      accs[nextBest] = accs[deployIdx] + 0.04 + Math.random() * 0.03;
+    }
+    return accs;
+  }
+
+  function doL1Deploy() {
+    if (l1Deployed || training) return;
+    l1Deployed = true;
+    document.getElementById('deploy-btn').disabled    = true;
+    document.getElementById('deploy-btn').textContent = 'Deploying…';
+
+    const realAccs      = getRealWorldAccs(deployModelIdx);
+    const deployedReal  = realAccs[deployModelIdx];
+    const bestRealIdx   = realAccs.reduce((bi, a, i) => a > realAccs[bi] ? i : bi, 0);
+
+    // Best training accuracy we observed for the deployed model
+    const deployedName  = MODEL_SETS[currentModelSet][deployModelIdx];
+    const modelRuns     = allRuns.filter(r => r.model === deployedName);
+    const bestTrainPct  = modelRuns.length > 0
+      ? Math.max(...modelRuns.map(r => r.pct))
+      : Math.max(...allRuns.filter(r => r.pct).map(r => r.pct), 80);
+
+    // Animate 30 data points
+    const streamEl = document.getElementById('l1-stream');
+    streamEl.style.display = 'grid';
+    streamEl.innerHTML = '';
+    const dots = Array.from({ length: 30 }, () => {
+      const d = document.createElement('div');
+      d.className = 'deploy-dot';
+      streamEl.appendChild(d);
+      return d;
+    });
+
+    let correct = 0, i = 0;
+    const tick = setInterval(() => {
+      if (i === 30) {
+        clearInterval(tick);
+        finalizeL1Deploy(bestTrainPct, correct / 30, realAccs, bestRealIdx, deployedName);
+        return;
+      }
+      const hit = Math.random() < deployedReal;
+      if (hit) correct++;
+      dots[i].className = 'deploy-dot ' + (hit ? 'correct' : 'wrong');
+      i++;
+    }, 110);
+
+    Log.event('l1_deploy', { deployModelIdx, deployedReal, bestRealIdx });
+  }
+
+  function finalizeL1Deploy(trainPct, realAcc, allRealAccs, bestRealIdx, deployedName) {
+    const realPct       = Math.round(realAcc * 100);
+    const bestModelName = MODEL_SETS[currentModelSet][bestRealIdx];
+    const bestRealPct   = Math.round(allRealAccs[bestRealIdx] * 100);
+    const gap           = trainPct - realPct;
+
+    document.getElementById('l1-results').style.display = 'block';
+    document.getElementById('l1-cmp-train').textContent = trainPct + '%';
+    document.getElementById('l1-cmp-real').textContent  = realPct + '%';
+    document.getElementById('l1-cmp-real').style.color  = gap > 5 ? 'var(--test)' : 'var(--train)';
+
+    const msg = document.getElementById('l1-reveal-msg');
+    msg.style.display    = 'block';
+    msg.style.border     = '1px solid var(--test)';
+    msg.style.background = 'color-mix(in srgb, var(--test) 10%, var(--surface))';
+    msg.innerHTML = `
+      🔴 <strong>${gap}% gap.</strong> <strong>${deployedName}</strong> looked great on your training data (${trainPct}%)
+      — a completely reasonable pick. But on real users it only managed ${realPct}%.<br><br>
+      <strong>${bestModelName}</strong> would have hit <strong>${bestRealPct}%</strong> in production — but your training
+      data gave you no way to know that.<br><br>
+      <em>This is why training accuracy can be misleading. In Level 2, you'll hold back a test set before training
+      so you have a real estimate — not just a training score.</em>
+    `;
+
+    State.setLevel(1, { completed: true });
+    Log.event('l1_deploy_done', { trainPct, realPct, bestRealIdx, bestRealPct });
+
+    setTimeout(() => {
+      document.getElementById('next-stage-container').style.display = 'block';
+      document.getElementById('next-stage-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      const banner = document.getElementById('guide-banner');
+      banner.style.borderColor = 'var(--accent)';
+      document.getElementById('guide-text').innerHTML =
+        `Now you've seen the problem firsthand. Level 2 introduces the solution: a held-out test set.`;
+    }, 700);
   }
 </script>
 </body>
