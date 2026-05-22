@@ -885,8 +885,8 @@ function renderLeaderboard() {
 
   renderModelHistory();
 
-  // Show deploy once 3 models are locked
-  if (lockedCount >= 3 && document.getElementById('deploy-section').style.display === 'none') {
+  // Show deploy once 3 models are locked; refresh picker on every subsequent lock
+  if (lockedCount >= 3) {
     showDeploySection();
   }
 }
