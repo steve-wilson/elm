@@ -111,14 +111,14 @@ const QUESTIONS = [
         feedback: "You had six different models to try — power wasn't the issue. Think about what information was available before you hit Deploy."
       },
       {
-        text: "The model had only ever seen training data, so there was no way to preview how it would handle new examples",
-        correct: true,
-        feedback: "Exactly. The model memorized what it practiced on. You had no way to know how it would do on genuinely new examples until it was already out in the world."
-      },
-      {
         text: "There wasn't enough training data",
         correct: false,
         feedback: "Data size helps, but even with more training data you'd face the same blind spot. The missing piece wasn't more data — it was a way to test before shipping."
+      },
+      {
+        text: "The model had only ever seen training data, so there was no way to preview how it would handle new examples",
+        correct: true,
+        feedback: "Exactly. The model memorized what it practiced on. You had no way to know how it would do on genuinely new examples until it was already out in the world."
       },
     ]
   },
@@ -151,14 +151,14 @@ const QUESTIONS = [
     q: "You've held back some data before training. The model has never seen it. What should you use it for?",
     opts: [
       {
-        text: "Train a second model on it",
-        correct: false,
-        feedback: "Then it's not held out anymore — you'd have the same blind spot you started with."
-      },
-      {
         text: "Evaluate the trained model on examples it has never seen",
         correct: true,
         feedback: "That held-out slice is your test set — a fair, unseen benchmark that gives you an honest estimate of real-world performance."
+      },
+      {
+        text: "Train a second model on it",
+        correct: false,
+        feedback: "Then it's not held out anymore — you'd have the same blind spot you started with."
       },
       {
         text: "Discard it to keep things simple",

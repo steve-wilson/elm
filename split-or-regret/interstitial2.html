@@ -158,14 +158,14 @@ const QUESTIONS = [
         feedback: "That gives you a very reliable estimate — but you're only training on half your data, which usually hurts the model more than it helps the estimate."
       },
       {
-        text: "80% train, 20% test",
-        correct: true,
-        feedback: "80/20 is the most common default. It gives the model enough data to learn well while keeping a meaningful slice for evaluation. That said, the right ratio depends on how much data you have in total."
-      },
-      {
         text: "99% train, 1% test",
         correct: false,
         feedback: "With only 1% for testing, your estimate would be extremely noisy — a handful of examples can't reliably represent real-world performance."
+      },
+      {
+        text: "80% train, 20% test",
+        correct: true,
+        feedback: "80/20 is the most common default. It gives the model enough data to learn well while keeping a meaningful slice for evaluation. That said, the right ratio depends on how much data you have in total."
       },
     ]
   },
@@ -173,14 +173,14 @@ const QUESTIONS = [
     q: "In Level 2 you checked the test set multiple times — to compare models, to decide whether to tune more. What's the issue with doing that?",
     opts: [
       {
-        text: "Nothing — more information always helps you make better decisions",
-        correct: false,
-        feedback: "More information does help decisions, but those decisions shape what you do next. And whatever you do next affects the model you eventually evaluate on that same test set."
-      },
-      {
         text: "Each time you use the test result to make a decision, that decision is reflected in the model you end up evaluating — so the test set is no longer measuring something it had no part in",
         correct: true,
         feedback: "Exactly. The test set is supposed to simulate the real world — data the model has never influenced. Once its results are guiding your choices, that isolation breaks down."
+      },
+      {
+        text: "Nothing — more information always helps you make better decisions",
+        correct: false,
+        feedback: "More information does help decisions, but those decisions shape what you do next. And whatever you do next affects the model you eventually evaluate on that same test set."
       },
       {
         text: "The test set gets smaller each time you check it",
