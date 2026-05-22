@@ -158,14 +158,14 @@ const QUESTIONS = [
         feedback: "That gives you a very reliable estimate — but you're only training on half your data, which usually hurts the model more than it helps the estimate."
       },
       {
-        text: "99% train, 1% test",
-        correct: false,
-        feedback: "With only 1% for testing, your estimate would be extremely noisy — a handful of examples can't reliably represent real-world performance."
-      },
-      {
         text: "80% train, 20% test",
         correct: true,
         feedback: "80/20 is the most common default. It gives the model enough data to learn well while keeping a meaningful slice for evaluation. That said, the right ratio depends on how much data you have in total."
+      },
+      {
+        text: "99% train, 1% test",
+        correct: false,
+        feedback: "With only 1% for testing, your estimate would be extremely noisy — a handful of examples can't reliably represent real-world performance."
       },
     ]
   },
