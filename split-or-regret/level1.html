@@ -461,16 +461,6 @@
       <div id="grid-container">
         <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;">
           <div class="section-label" style="margin-bottom:0;">Data — your collected training examples</div>
-          <div id="class-legend" style="display:none;font-size:0.75rem;color:var(--muted);gap:10px;align-items:center;">
-            <span style="display:flex;align-items:center;gap:4px;">
-              <svg width="9" height="9" viewBox="0 0 10 10" style="color:var(--block-selected);flex-shrink:0;"><rect fill="currentColor" width="10" height="10"/></svg>
-              A: <span id="legend-a-count">0</span>
-            </span>
-            <span style="display:flex;align-items:center;gap:4px;">
-              <svg width="9" height="9" viewBox="0 0 10 10" style="color:var(--block-selected);flex-shrink:0;"><rect fill="currentColor" width="10" height="10"/><circle fill="var(--surface)" cx="5" cy="5" r="2.8"/></svg>
-              B: <span id="legend-b-count">0</span>
-            </span>
-          </div>
         </div>
         <div id="data-grid"></div>
       </div>
@@ -559,6 +549,8 @@
 </div>
 <div id="tooltip"></div>
 
+<script src="js/state.js"></script>
+<script src="js/log.js"></script>
 <script>
   // ── Tooltips ───────────────────────────────────────────────────────
   const TIPS = {
@@ -612,30 +604,16 @@
     realistic: ['SVM','RandForest','GradBoost','NeuralNet','KNN','NaiveBayes'],
   };
 
-  // Per-model accuracy curves:
-  //   acc = clamp(base + totalRatio*scale + classBalance*classBias + jitter*(rand-0.5))
-  //   classBalance = (countA - countB) / selected.size  → range [-1, +1]
-  //   positive classBias = benefits from more Class A; negative = benefits from more Class B
   const MODEL_CURVES = [
-    { base: 0.52, scale: 0.38, jitter: 0.04, classBias:  0.00 }, // 0: truly balanced
-    { base: 0.44, scale: 0.46, jitter: 0.04, classBias:  0.18 }, // 1: A-specialist
-    { base: 0.63, scale: 0.22, jitter: 0.02, classBias: -0.15 }, // 2: B-specialist, quick plateau
-    { base: 0.50, scale: 0.36, jitter: 0.12, classBias:  0.08 }, // 3: high variance, slight A lean
-    { base: 0.40, scale: 0.54, jitter: 0.04, classBias: -0.20 }, // 4: B-specialist, slow start, high ceiling
-    { base: 0.56, scale: 0.33, jitter: 0.03, classBias:  0.07 }, // 5: reliable, slight A lean
+    { base: 0.52, scale: 0.38, jitter: 0.04 },
+    { base: 0.44, scale: 0.46, jitter: 0.04 },
+    { base: 0.63, scale: 0.22, jitter: 0.02 },
+    { base: 0.50, scale: 0.36, jitter: 0.12 },
+    { base: 0.40, scale: 0.54, jitter: 0.04 },
+    { base: 0.56, scale: 0.33, jitter: 0.03 },
   ];
 
   const SVG_A = `<svg viewBox="0 0 10 10"><rect class="block-fill" width="10" height="10"/></svg>`;
-  const SVG_B = `<svg viewBox="0 0 10 10"><rect class="block-fill" width="10" height="10"/><circle class="block-hole" cx="5" cy="5" r="2.8"/></svg>`;
-
-  let blockClasses = [];
-  let sessionClassARatio = 0.5;
-  function initBlockClasses() {
-    // 55/45 to 75/25 in favour of A, randomised each session
-    sessionClassARatio = 0.55 + Math.random() * 0.20;
-    blockClasses = Array.from({length: TOTAL}, () => Math.random() < sessionClassARatio ? 'A' : 'B');
-  }
-  initBlockClasses();
 
   let currentModelSet = 'greek';
   let selectedModel = 0;
@@ -722,7 +700,7 @@
     b.innerHTML = SVG_A; // revealed on collection
     b.addEventListener('mouseenter', e => {
       const text = b.classList.contains('selected')
-        ? `ID ${i}: Class ${blockClasses[i]}`
+        ? `ID ${i}`
         : 'empty — not yet collected';
       showHoverTip(text, e.clientX, e.clientY);
     });
@@ -737,16 +715,6 @@
       `${selected.size} / ${TOTAL} examples collected`;
     const pct = (selected.size / POPULATION * 100).toFixed(3);
     document.getElementById('population-pct').textContent = `(≈ ${pct}% of all data)`;
-    const countA = [...selected].filter(i => blockClasses[i] === 'A').length;
-    const countB = selected.size - countA;
-    const legend = document.getElementById('class-legend');
-    if (selected.size > 0) {
-      legend.style.display = 'flex';
-      document.getElementById('legend-a-count').textContent = countA;
-      document.getElementById('legend-b-count').textContent = countB;
-    } else {
-      legend.style.display = 'none';
-    }
   }
 
   // ── Data collection ────────────────────────────────────────────────
@@ -802,7 +770,7 @@
     const flyer = document.createElement('div');
     flyer.className = 'block-flyer';
     flyer.style.cssText = `width:${size}px;height:${size}px;left:${sx - size/2}px;top:${sy - size/2}px;`;
-    flyer.innerHTML = blockClasses[idx] === 'A' ? SVG_A : SVG_B;
+    flyer.innerHTML = SVG_A;
     flyer.style.color = getComputedStyle(targetBlock).color;
     document.body.appendChild(flyer);
 
@@ -817,7 +785,7 @@
     setTimeout(() => {
       flyer.remove();
       selected.add(idx);
-      targetBlock.innerHTML = blockClasses[idx] === 'A' ? SVG_A : SVG_B;
+      targetBlock.innerHTML = SVG_A;
       targetBlock.classList.add('selected', 'settling');
       setTimeout(() => targetBlock.classList.remove('settling'), 300);
       updateCount();
@@ -855,7 +823,7 @@
       stopCollecting();
       document.getElementById('collect-btn').disabled = true;
       setPulse('train-btn');
-      positionGuide('controls', `You've collected ${HALF} examples. Now click <strong>Train</strong> to see how your model performs on this data!`, { color: 'var(--train)' });
+      positionGuide('controls', `That's a good start — click <strong>Train</strong> to see how your model performs on this data!`, { color: 'var(--train)' });
     }
   }
 
@@ -895,7 +863,7 @@
     const el = document.createElement('div');
     el.className = 'pool-block';
     el.style.cssText = `width:${POOL_BS}px;height:${POOL_BS}px;opacity:0;`;
-    el.innerHTML = Math.random() < 0.5 ? SVG_A : SVG_B;
+    el.innerHTML = SVG_A;
     el.style.setProperty('--dx', (Math.random() * 28 - 14).toFixed(1) + 'px');
     el.style.setProperty('--dy', (Math.random() * 18 - 9).toFixed(1) + 'px');
     el.style.setProperty('--pd', (4 + Math.random() * 7).toFixed(1) + 's');
@@ -999,19 +967,19 @@
       trainBtn.disabled = false;
       trainBtn.textContent = '▶ Train';
 
-      const ratio        = selected.size / TOTAL;
-      const countA       = [...selected].filter(i => blockClasses[i] === 'A').length;
-      const classBalance = selected.size > 0 ? (countA - (selected.size - countA)) / selected.size : 0;
-      const curve        = MODEL_CURVES[selectedModel];
-      const acc          = Math.min(0.98, Math.max(0.50,
-        curve.base + ratio * curve.scale + classBalance * curve.classBias + curve.jitter * (Math.random() - 0.5)));
+      const ratio = selected.size / TOTAL;
+      const curve = MODEL_CURVES[selectedModel];
+      const acc   = Math.min(0.98, Math.max(0.50,
+        curve.base + ratio * curve.scale + curve.jitter * (Math.random() - 0.5)));
       const pct   = Math.round(acc * 100);
       const modelName = MODEL_SETS[currentModelSet][selectedModel];
 
       const prevBest  = allRuns.length ? Math.max(...allRuns.map(r => r.pct)) : -1;
       const isNewBest = pct > prevBest;
-      const collectedA = [...selected].filter(i => blockClasses[i] === 'A').length;
-      allRuns.unshift({ pct, blocks: selected.size, id: allRuns.length + 1, model: modelName, modelIdx: selectedModel, classARatio: sessionClassARatio, collectedA, collectedB: selected.size - collectedA });
+      allRuns.unshift({ pct, blocks: selected.size, id: allRuns.length + 1, model: modelName, modelIdx: selectedModel });
+
+      State.setLevel(1, { started: true, bestAccuracy: Math.max(acc, State.getLevel(1).bestAccuracy || 0) });
+      Log.event('train_run', { level: 1, runId: allRuns.length, modelIdx: selectedModel, modelName, collected: selected.size, trainAccuracy: pct, isNewBest });
 
       const panel = document.getElementById('accuracy-panel');
       panel.style.display = 'block';
@@ -1133,12 +1101,8 @@
 
   function goNextStage() {
     document.getElementById('insight-overlay').style.display = 'none';
-    // Bridge theme + model set into the shared state system level 2 reads from
-    const currentTheme = document.body.className.replace('theme-', '');
-    const sor = JSON.parse(localStorage.getItem('sor_state') || '{}');
-    sor.theme    = currentTheme;
-    sor.modelSet = currentModelSet;
-    localStorage.setItem('sor_state', JSON.stringify(sor));
+    State.set('theme',    document.body.className.replace('theme-', ''));
+    State.set('modelSet', currentModelSet);
     window.location.href = 'interstitial.html';
   }
 
@@ -1165,6 +1129,7 @@
     selectedModel = deployPickIdx;
     document.getElementById('deploy-section').style.display = 'none';
     lockPostDeploy();
+    Log.event('deploy_confirm', { level: 1, modelIdx: deployPickIdx, modelName: MODEL_SETS[currentModelSet][deployPickIdx] });
     runDeploy();
   }
 
@@ -1205,7 +1170,6 @@
       const j = Math.floor(Math.random() * (i + 1));
       [outcomes[i], outcomes[j]] = [outcomes[j], outcomes[i]];
     }
-    const ptTypes = Array.from({length: N}, () => Math.random() < 0.5 ? 'A' : 'B');
 
     // Show deploy zone and populate empty slots
     const deployZone = document.getElementById('deploy-zone');
@@ -1245,7 +1209,7 @@
       flyer.className = 'block-flyer';
       flyer.style.cssText = `width:${size}px;height:${size}px;left:${sx-size/2}px;top:${sy-size/2}px;`;
       flyer.style.color = `var(--block-default)`;
-      flyer.innerHTML = ptTypes[i] === 'A' ? SVG_A : SVG_B;
+      flyer.innerHTML = SVG_A;
       document.body.appendChild(flyer);
 
       const tx = slotRect.left - (sx - size/2);
@@ -1258,7 +1222,7 @@
       setTimeout(() => {
         flyer.remove();
         slot.className = `block deploy-block ${outcomes[i] ? 'correct' : 'incorrect'} settling`;
-        slot.innerHTML = ptTypes[i] === 'A' ? SVG_A : SVG_B;
+        slot.innerHTML = SVG_A;
         setTimeout(() => slot.classList.remove('settling'), 300);
 
         if (!outcomes[i]) {
@@ -1318,6 +1282,16 @@
 
     html += `</div>`;
     resultEl.innerHTML = html;
+
+    State.setLevel(1, { completed: true, bestAccuracy: userPct / 100 });
+    Log.event('deploy_result', {
+      level: 1,
+      deployedModelIdx: userIdx, deployedModelName: userName,
+      deployAccuracy: userPct,
+      bestModelIdx: bestIdx, bestModelName: MODEL_SETS[currentModelSet][bestIdx],
+      bestAccuracy: bestPct,
+      pickedBest: userIdx === bestIdx,
+    });
 
     // Pulsing continue button
     const continueBtn = document.createElement('button');
@@ -1398,7 +1372,6 @@
     collectHoldStart = null;
 
     // Reset UI
-    initBlockClasses();
     document.getElementById('pool-zone').querySelectorAll('.pool-block').forEach(b => b.remove());
     document.querySelectorAll('.block').forEach(b => {
       b.classList.remove('selected');

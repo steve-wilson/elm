@@ -129,14 +129,83 @@
   .test-score.bad  { color: var(--test); }
   .lb-dash { color: var(--muted); font-size: 0.82rem; }
 
+  /* ── Deploy section ── */
+  .deploy-stream {
+    display: grid; grid-template-columns: repeat(12, 1fr);
+    gap: 6px; margin: 14px 0;
+  }
+  .deploy-dot {
+    aspect-ratio: 1; border-radius: 50%;
+    background: var(--border); transition: background 0.15s;
+  }
+  .deploy-dot.correct { background: var(--train); }
+  .deploy-dot.wrong   { background: var(--test); }
+
+  .deploy-compare {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px;
+  }
+  .cmp-card {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: calc(var(--radius) / 1.5); padding: 14px 16px; text-align: center;
+  }
+  .cmp-card-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--muted); margin-bottom: 6px;
+  }
+  .cmp-val   { font-size: 1.9rem; font-weight: 800; line-height: 1; }
+  .cmp-test  { color: var(--val); }
+  .cmp-real-good { color: var(--train); }
+  .cmp-real-bad  { color: var(--test); }
+
+  .outcome-msg {
+    padding: 12px 16px; border-radius: var(--radius);
+    font-size: 0.9rem; line-height: 1.6; margin-top: 14px;
+  }
+  .outcome-good { background: color-mix(in srgb, var(--train) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--train) 35%, var(--surface)); }
+  .outcome-warn { background: color-mix(in srgb, var(--test) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--test) 30%, var(--surface)); }
+
+
+  /* ── Two-column leaderboard grid ── */
+  #lb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* ── Per-model run history ── */
+  .mhist-row {
+    display: grid;
+    grid-template-columns: 20px 1fr 1fr 40px 40px;
+    gap: 5px; align-items: center;
+    padding: 7px 10px; margin-bottom: 5px;
+    border-radius: calc(var(--radius) / 1.5);
+    border: 1px solid var(--border); background: var(--bg);
+  }
+  .mhist-row.mhist-header {
+    background: none; border-color: transparent;
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--muted);
+    padding-bottom: 2px; margin-bottom: 0;
+  }
+  .mhist-row.mhist-header div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mhist-row:not(.mhist-header):hover { border-color: var(--accent); }
+  .mhist-row.best     { border-color: var(--val); background: color-mix(in srgb, var(--val) 7%, var(--bg)); }
+  .mhist-row.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--bg)); }
+  .mhist-rank  { font-size: 0.7rem; font-weight: 700; color: var(--muted); }
+  .mhist-hpval { font-size: 0.8rem; font-weight: 700; }
+  .mhist-acc   { font-size: 0.8rem; font-weight: 700; text-align: right; }
+  .mhist-train { color: var(--train); }
+  .mhist-val   { color: var(--val); }
+
+  @media (max-width: 700px) {
+    #lb-grid { grid-template-columns: 1fr; }
+  }
   @media (max-width: 600px) {
     .hp-name { width: 110px; font-size: 0.78rem; }
     .lb-row { grid-template-columns: 22px 1fr auto 42px auto; gap: 6px; padding: 8px 10px; }
     .lb-hps { display: none; }
+    .deploy-stream { grid-template-columns: repeat(8, 1fr); }
   }
   @media (max-width: 480px) {
     .interstitial-card { padding: 28px 22px; }
     .split-zones { flex-wrap: wrap; gap: 6px; }
+    .deploy-stream { grid-template-columns: repeat(6, 1fr); }
   }
 </style>
 </head>
@@ -239,16 +308,6 @@
     <div class="split-container">
       <div class="split-zones">
         <span class="zone-lbl lbl-train">Train <span class="split-ct" id="train-ct"></span></span>
-        <div id="class-legend">
-          <span style="display:flex;align-items:center;gap:4px;">
-            <svg width="9" height="9" viewBox="0 0 10 10" style="color:var(--block-selected);flex-shrink:0;"><rect fill="currentColor" width="10" height="10"/></svg>
-            A: <span id="legend-a-count">—</span>
-          </span>
-          <span style="display:flex;align-items:center;gap:4px;">
-            <svg width="9" height="9" viewBox="0 0 10 10" style="color:var(--block-selected);flex-shrink:0;"><rect fill="currentColor" width="10" height="10"/><circle fill="var(--surface)" cx="5" cy="5" r="2.8"/></svg>
-            B: <span id="legend-b-count">—</span>
-          </span>
-        </div>
         <span class="zone-lbl lbl-val">Val <span class="split-ct" id="val-ct"></span></span>
         <span class="zone-lbl lbl-test">
           <svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor" style="flex-shrink:0;">
@@ -320,21 +379,28 @@
       </div>
     </div>
 
-    <!-- Leaderboard -->
-    <div id="leaderboard-panel" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-top:16px;">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;">
-        <div class="section-label" style="margin-bottom:0;">Leaderboard</div>
-        <span id="lb-hint" style="font-size:0.78rem;color:var(--muted);"></span>
+    <!-- Leaderboard (two-column: overall + per-model history) -->
+    <div id="leaderboard-panel" style="display:none;margin-top:16px;">
+      <div id="lb-grid">
+        <!-- Left: per-model run history -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+          <div class="section-label" id="mhist-label" style="margin-bottom:10px;">Runs</div>
+          <div id="model-history"></div>
+        </div>
+        <!-- Right: overall leaderboard -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;">
+            <div class="section-label" style="margin-bottom:0;">Leaderboard</div>
+            <span id="lb-hint" style="font-size:0.78rem;color:var(--muted);"></span>
+          </div>
+          <div style="display:grid;grid-template-columns:26px minmax(60px,1fr) auto 48px auto;gap:8px;padding:0 12px 6px;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">
+            <div></div><div>Model</div><div>HPs</div>
+            <div style="text-align:right;">Val</div>
+            <div style="text-align:right;min-width:80px;">Test</div>
+          </div>
+          <div id="leaderboard"></div>
+        </div>
       </div>
-      <!-- Column headers -->
-      <div style="display:grid;grid-template-columns:26px minmax(60px,1fr) auto 48px auto;gap:8px;padding:0 12px 6px;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">
-        <div></div>
-        <div>Model</div>
-        <div>HPs</div>
-        <div style="text-align:right;">Val</div>
-        <div style="text-align:right;min-width:80px;">Test</div>
-      </div>
-      <div id="leaderboard"></div>
     </div>
 
     <!-- Deploy section (stage 3) -->
@@ -350,10 +416,10 @@
 <script>
 // ── Model & HP config ─────────────────────────────────────────────────────────
 const MODEL_NAMES = {
-  greek:     ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta'],
-  animals:   ['Fox', 'Wolf', 'Bear', 'Eagle', 'Shark', 'Tiger'],
-  zodiac:    ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo'],
-  realistic: ['SVM', 'Random Forest', 'Gradient Boosting', 'Neural Net', 'KNN', 'Naive Bayes'],
+  greek:     ['α','β','γ','δ','ε','ζ'],
+  animals:   ['🦊','🐺','🐻','🦅','🦈','🐯'],
+  zodiac:    ['♈','♉','♊','♋','♌','♍'],
+  realistic: ['SVM','RandForest','GradBoost','NeuralNet','KNN','NaiveBayes'],
 };
 
 const HP_CONFIG = [
@@ -392,18 +458,18 @@ const HP_CONFIG = [
 // hp2PenaltyMax: max validation penalty when HP2 is fully wrong
 // jitter: run-to-run noise amplitude
 const CURVES = [
-  // Pos 0 (SVM/Alpha): moderate tolerance, tight HP2 sweet spot
-  { base:0.57, hp1TrainBoost:0.34, hp1sweet:58, hp1OverfitMax:0.38, hp2sweet:42, hp2PenaltyMax:0.22, jitter:0.028 },
-  // Pos 1 (RandForest/Beta): very tolerant of high HP1, wide HP2 range
-  { base:0.53, hp1TrainBoost:0.38, hp1sweet:74, hp1OverfitMax:0.20, hp2sweet:58, hp2PenaltyMax:0.15, jitter:0.035 },
-  // Pos 2 (GradBoost/Gamma): overfits fast with high HP1
-  { base:0.50, hp1TrainBoost:0.42, hp1sweet:32, hp1OverfitMax:0.48, hp2sweet:62, hp2PenaltyMax:0.26, jitter:0.040 },
-  // Pos 3 (NeuralNet/Delta): moderate sensitivity, symmetric HP2 sweet spot
-  { base:0.54, hp1TrainBoost:0.32, hp1sweet:50, hp1OverfitMax:0.35, hp2sweet:50, hp2PenaltyMax:0.20, jitter:0.045 },
-  // Pos 4 (KNN/Epsilon): 1 param, sweet spot at mid-low
-  { base:0.52, hp1TrainBoost:0.38, hp1sweet:40, hp1OverfitMax:0.42, jitter:0.030 },
-  // Pos 5 (NaiveBayes/Zeta): 1 param, high base, gentle curve
-  { base:0.63, hp1TrainBoost:0.22, hp1sweet:55, hp1OverfitMax:0.28, jitter:0.020 },
+  // Pos 0 (SVM/Alpha): HP2 sweet at 25 (far from default 50) — +12% improvable
+  { base:0.66, hp1TrainBoost:0.36, hp1sweet:48, hp1OverfitMax:0.42, hp2sweet:25, hp2PenaltyMax:0.24, jitter:0.028 },
+  // Pos 1 (RandForest/Beta): needs high HP1 & HP2 to peak — +13% improvable
+  { base:0.62, hp1TrainBoost:0.32, hp1sweet:62, hp1OverfitMax:0.22, hp2sweet:72, hp2PenaltyMax:0.18, jitter:0.035 },
+  // Pos 2 (GradBoost/Gamma): sweet at low HP1=22, overfits fast — +11% improvable
+  { base:0.65, hp1TrainBoost:0.55, hp1sweet:22, hp1OverfitMax:0.55, hp2sweet:62, hp2PenaltyMax:0.26, jitter:0.040 },
+  // Pos 3 (NeuralNet/Delta): HP2 sweet at 75 (far from default 50) — +11% improvable
+  { base:0.64, hp1TrainBoost:0.42, hp1sweet:42, hp1OverfitMax:0.38, hp2sweet:75, hp2PenaltyMax:0.22, jitter:0.045 },
+  // Pos 4 (KNN/Epsilon): 1 param, needs low HP1 around 34 — +8% improvable
+  { base:0.69, hp1TrainBoost:0.45, hp1sweet:15, hp1OverfitMax:0.65, jitter:0.030 },
+  // Pos 5 (NaiveBayes/Zeta): 1 param, naturally high baseline (~92% out of box)
+  { base:0.72, hp1TrainBoost:0.24, hp1sweet:52, hp1OverfitMax:0.30, jitter:0.020 },
 ];
 
 // ── Tooltips ──────────────────────────────────────────────────────────────────
@@ -443,16 +509,16 @@ const TEST_SIZE  = 24;
 const TEST_START = TOTAL - TEST_SIZE;  // 96
 
 const SVG_A = `<svg viewBox="0 0 10 10"><rect class="block-fill" width="10" height="10"/></svg>`;
-const SVG_B = `<svg viewBox="0 0 10 10"><rect class="block-fill" width="10" height="10"/><circle class="block-hole" cx="5" cy="5" r="2.8"/></svg>`;
 
 // ── Session state ─────────────────────────────────────────────────────────────
-let blockClasses = [];
 let trainPt      = 72;
 let splitLocked  = false;
 let selModel     = 0;
 let busy         = false;
 let pendingRevealIdx = -1;
 let _pulseEl     = null;
+let deployModelIdx = -1;
+let deployDone     = false;
 
 // Per-model state
 const mSt = Array.from({length: 6}, () => ({
@@ -460,12 +526,8 @@ const mSt = Array.from({length: 6}, () => ({
   trained: false, lockedIn: false,
   trainAcc: null, valAcc: null, testAcc: null,
   lockedHp1: null, lockedHp2: null,
+  runs: [],
 }));
-
-function initBlockClasses() {
-  blockClasses = Array.from({length: TOTAL}, () => Math.random() < 0.5 ? 'A' : 'B');
-}
-initBlockClasses();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function getModelSet() { return State.get('modelSet') || 'greek'; }
@@ -489,8 +551,9 @@ function computeAccuracy(modelIdx, hp1, hp2) {
   const trainRatio = trainPt / TOTAL;
   const hp1n     = hp1 / 100;
 
-  // Train accuracy: grows with HP1 and with more training data
-  const rawTrain = c.base + trainRatio * 0.13 + hp1n * c.hp1TrainBoost;
+  // Train accuracy: grows with training data but plateaus after 75 examples
+  const trainBoost = Math.min(trainPt, 75) / 75 * 0.13;
+  const rawTrain = c.base + trainBoost + hp1n * c.hp1TrainBoost;
   const trainAcc = clamp(rawTrain + c.jitter * (Math.random() - 0.5), 0.40, 0.97);
 
   // Overfitting: quadratic penalty when HP1 exceeds sweet spot
@@ -505,7 +568,7 @@ function computeAccuracy(modelIdx, hp1, hp2) {
     hp2P = Math.min(1, dist) * c.hp2PenaltyMax;
   }
 
-  const baseGap = 0.07 + (1 - trainRatio) * 0.03;
+  const baseGap = 0.04 + (1 - trainRatio) * 0.02;
   const valAcc  = clamp(
     trainAcc - baseGap - overP - hp2P + c.jitter * (Math.random() - 0.5),
     0.33, trainAcc
@@ -514,8 +577,11 @@ function computeAccuracy(modelIdx, hp1, hp2) {
 }
 
 function computeTestAcc(valAcc) {
-  // Test closely mirrors val — the whole point is that test hasn't been peeked at
-  return clamp(valAcc + (Math.random() - 0.5) * 0.04, 0.33, 0.97);
+  // Gap shrinks as validation set grows — more val data = more reliable estimate
+  // noise = 0.18 / sqrt(valPt): ±7% at valPt=6, ±4% at valPt=24, ±2% at valPt=72
+  const valPt = TEST_START - trainPt;
+  const noise = 0.18 / Math.sqrt(valPt);
+  return clamp(valAcc + (Math.random() - 0.5) * 2 * noise, 0.33, 0.97);
 }
 
 // ── Grid ──────────────────────────────────────────────────────────────────────
@@ -526,10 +592,10 @@ function renderGrid() {
     const zone = i < trainPt ? 'train' : i < TEST_START ? 'val' : 'test';
     const b = document.createElement('div');
     b.className = 'block ' + zone;
-    b.innerHTML = blockClasses[i] === 'A' ? SVG_A : SVG_B;
+    b.innerHTML = SVG_A;
     b.addEventListener('mouseenter', e => {
       const label = zone === 'train' ? 'Train' : zone === 'val' ? 'Validation' : 'Test (held out)';
-      showHoverTip(`${label} · ID ${i}: Class ${blockClasses[i]}`, e.clientX, e.clientY);
+      showHoverTip(`${label} · ID ${i}`, e.clientX, e.clientY);
     });
     b.addEventListener('mouseleave', hideHoverTip);
     g.appendChild(b);
@@ -545,9 +611,6 @@ function updateSplitUI() {
   document.getElementById('bar-train').style.flex = String(trainPt);
   document.getElementById('bar-val').style.flex   = String(valPt);
   document.getElementById('bar-test').style.flex  = String(TEST_SIZE);
-  const countA = blockClasses.filter(c => c === 'A').length;
-  document.getElementById('legend-a-count').textContent = countA;
-  document.getElementById('legend-b-count').textContent = TOTAL - countA;
 }
 
 function lockSplit() {
@@ -585,6 +648,9 @@ function selectModel(i) {
     showAccuracyFor(i);
   } else {
     document.getElementById('accuracy-panel').style.display = 'none';
+  }
+  if (document.getElementById('leaderboard-panel').style.display !== 'none') {
+    renderModelHistory();
   }
 }
 
@@ -646,7 +712,7 @@ function doTrain() {
 
   const ms       = mSt[selModel];
   const hp2arg   = hasHp2(selModel) ? ms.hp2 : null;
-  const duration = Math.max(800, (trainPt / TOTAL) * 4500);
+  const duration = Math.max(400, (trainPt / TOTAL) * 2250);
 
   const sweep = document.createElement('div');
   sweep.className = 'train-sweep';
@@ -660,6 +726,7 @@ function doTrain() {
     ms.trainAcc = trainAcc;
     ms.valAcc   = valAcc;
     ms.trained  = true;
+    ms.runs.push({ hp1: ms.hp1, hp2: hp2arg, trainAcc, valAcc });
 
     hideProg();
     renderModelBtns();
@@ -706,17 +773,29 @@ function setBar(barId, pctId, val) {
 
 // ── Leaderboard ───────────────────────────────────────────────────────────────
 function renderLeaderboard() {
-  const labels   = getLabels();
-  const set      = getModelSet();
+  const labels    = getLabels();
+  const set       = getModelSet();
   const container = document.getElementById('leaderboard');
+
+  // FLIP — snapshot current row positions keyed by model index
+  const oldPos = {};
+  container.querySelectorAll('.lb-row[data-idx]').forEach(row => {
+    oldPos[+row.dataset.idx] = row.getBoundingClientRect().top;
+  });
+
   container.innerHTML = '';
 
-  // Sort: trained by val desc, then untrained
+  // Sort: locked (by testAcc desc) → trained-not-locked (by valAcc desc) → untrained
   const order = Array.from({length: 6}, (_, i) => i).sort((a, b) => {
-    if (!mSt[a].trained && !mSt[b].trained) return a - b;
-    if (!mSt[a].trained) return 1;
-    if (!mSt[b].trained) return -1;
-    return mSt[b].valAcc - mSt[a].valAcc;
+    const aL = mSt[a].lockedIn, bL = mSt[b].lockedIn;
+    const aT = mSt[a].trained,  bT = mSt[b].trained;
+    if (aL && bL)  return mSt[b].testAcc - mSt[a].testAcc;
+    if (aL)        return -1;
+    if (bL)        return 1;
+    if (aT && bT)  return mSt[b].valAcc - mSt[a].valAcc;
+    if (aT)        return -1;
+    if (bT)        return 1;
+    return a - b;
   });
 
   const lockedCount = mSt.filter(m => m.lockedIn).length;
@@ -730,11 +809,12 @@ function renderLeaderboard() {
     const cfg = HP_CONFIG[i][set];
     const row = document.createElement('div');
     row.className = 'lb-row' + (!ms.trained ? ' untrained' : ms.lockedIn ? ' is-locked' : '');
+    row.dataset.idx = i;
 
-    // Rank
+    // Rank — only shown for locked-in (revealed) models
     const rankEl = document.createElement('div');
     rankEl.className = 'lb-rank';
-    rankEl.textContent = ms.trained ? '#' + rank++ : '—';
+    rankEl.textContent = ms.lockedIn ? '#' + rank++ : '—';
     row.appendChild(rankEl);
 
     // Model name
@@ -742,7 +822,7 @@ function renderLeaderboard() {
     nameEl.className = 'lb-name'; nameEl.textContent = labels[i];
     row.appendChild(nameEl);
 
-    // HP values (compact)
+    // HP values
     const hpEl = document.createElement('div');
     hpEl.className = 'lb-hps';
     if (ms.trained) {
@@ -760,7 +840,7 @@ function renderLeaderboard() {
     valEl.textContent = ms.trained ? fmtPct(ms.valAcc) : '—';
     row.appendChild(valEl);
 
-    // Test accuracy or reveal button or dash
+    // Test column
     const testEl = document.createElement('div');
     testEl.className = 'lb-test';
     if (!ms.trained) {
@@ -786,10 +866,85 @@ function renderLeaderboard() {
     container.appendChild(row);
   });
 
+  // FLIP — animate rows that changed position
+  container.querySelectorAll('.lb-row[data-idx]').forEach(row => {
+    const idx = +row.dataset.idx;
+    if (oldPos[idx] === undefined) return;
+    const delta = oldPos[idx] - row.getBoundingClientRect().top;
+    if (Math.abs(delta) < 2) return;
+    row.style.transition = 'none';
+    row.style.transform  = `translateY(${delta}px)`;
+    row.getBoundingClientRect(); // force reflow
+    row.style.transition = 'transform 0.4s ease';
+    row.style.transform  = 'translateY(0)';
+    row.addEventListener('transitionend', () => {
+      row.style.transition = '';
+      row.style.transform  = '';
+    }, { once: true });
+  });
+
+  renderModelHistory();
+
   // Show deploy once 3 models are locked
   if (lockedCount >= 3 && document.getElementById('deploy-section').style.display === 'none') {
     showDeploySection();
   }
+}
+
+// ── Per-model run history ─────────────────────────────────────────────────────
+function renderModelHistory() {
+  const container = document.getElementById('model-history');
+  if (!container) return;
+
+  const ms    = mSt[selModel];
+  const set   = getModelSet();
+  const cfg   = HP_CONFIG[selModel][set];
+  const label = getLabels()[selModel];
+  const has2  = hasHp2(selModel);
+
+  document.getElementById('mhist-label').textContent = label + ' — Runs';
+
+  container.innerHTML = '';
+
+  if (!ms.runs || ms.runs.length === 0) {
+    container.innerHTML = '<div style="font-size:0.82rem;color:var(--muted);padding:4px 0;">No runs yet — train this model to see results here.</div>';
+    return;
+  }
+
+  // Column header row
+  const header = document.createElement('div');
+  header.className = 'mhist-row mhist-header';
+  header.innerHTML = `<div></div><div>${cfg.hp1}</div><div>${has2 ? cfg.hp2 : ''}</div><div style="text-align:right;color:var(--train);">Train</div><div style="text-align:right;color:var(--val);">Val</div>`;
+  container.appendChild(header);
+
+  [...ms.runs]
+    .sort((a, b) => b.valAcc - a.valAcc)
+    .forEach((run, rank) => {
+      const isSelected = run.hp1 === ms.hp1 && run.trainAcc === ms.trainAcc && run.valAcc === ms.valAcc;
+      const row = document.createElement('div');
+      row.className = 'mhist-row' + (rank === 0 ? ' best' : '') + (isSelected ? ' selected' : '');
+      row.innerHTML = `
+        <div class="mhist-rank">#${rank + 1}</div>
+        <div class="mhist-hpval">${run.hp1}</div>
+        <div class="mhist-hpval">${run.hp2 !== null ? run.hp2 : ''}</div>
+        <div class="mhist-acc mhist-train">${fmtPct(run.trainAcc)}</div>
+        <div class="mhist-acc mhist-val">${fmtPct(run.valAcc)}</div>`;
+
+      if (!ms.lockedIn) {
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', () => {
+          ms.hp1 = run.hp1;
+          if (run.hp2 !== null) ms.hp2 = run.hp2;
+          ms.trainAcc = run.trainAcc;
+          ms.valAcc   = run.valAcc;
+          renderHpPanel();
+          showAccuracyFor(selModel);
+          renderLeaderboard();
+        });
+      }
+
+      container.appendChild(row);
+    });
 }
 
 // ── Reveal test ───────────────────────────────────────────────────────────────
@@ -828,17 +983,152 @@ function cancelReveal() {
   pendingRevealIdx = -1;
 }
 
-// ── Deploy section placeholder (stage 3 will fill this) ───────────────────────
+// ── Deploy section ────────────────────────────────────────────────────────────
 function showDeploySection() {
   const el = document.getElementById('deploy-section');
+  if (el.innerHTML.trim()) { el.style.display = 'block'; return; }
   el.style.display = 'block';
   el.innerHTML = `
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-top:16px;">
-      <div class="section-label" style="margin-bottom:8px;">🚀 Deploy a model</div>
-      <p style="font-size:0.88rem;color:var(--muted);">Deploy coming in the next stage.</p>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-top:16px;" id="deploy-inner">
+      <div class="section-label" style="margin-bottom:10px;">Deploy a model</div>
+      <p style="font-size:0.88rem;color:var(--muted);margin-bottom:14px;">
+        Pick the model you trust most — the one with the validation score you'd bet on:
+      </p>
+      <div id="deploy-picker" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
+      <div style="display:flex;align-items:center;gap:10px;" id="deploy-controls">
+        <button class="btn btn-next-stage" id="deploy-btn" onclick="startDeploy()">🚀 Deploy</button>
+        <button class="info-btn" onclick="showTooltip(this,event)" data-tip="deploy">i</button>
+      </div>
+      <div class="deploy-stream" id="deploy-stream" style="display:none;"></div>
+      <div id="deploy-result-section" style="display:none;">
+        <div class="deploy-compare" id="deploy-compare"></div>
+        <div id="outcome-msg"></div>
+        <div style="margin-top:16px;" id="continue-row">
+          <button class="btn btn-next-stage" id="continue-btn" onclick="goNext()">Continue →</button>
+        </div>
+      </div>
     </div>`;
+
+  // Pre-select best locked model by test accuracy
+  const locked = mSt.map((m, i) => ({ i, testAcc: m.testAcc })).filter(x => mSt[x.i].lockedIn);
+  locked.sort((a, b) => b.testAcc - a.testAcc);
+  deployModelIdx = locked[0].i;
+
+  renderDeployPicker();
+  setPulse('deploy-btn');
   setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
   updateBanner();
+}
+
+function renderDeployPicker() {
+  const labels = getLabels();
+  const c = document.getElementById('deploy-picker');
+  if (!c) return;
+  c.innerHTML = '';
+  mSt.forEach((ms, i) => {
+    if (!ms.lockedIn) return;
+    const btn = document.createElement('button');
+    btn.className = 'model-btn' + (i === deployModelIdx ? ' active' : '');
+    btn.innerHTML = labels[i] + ` <span style="font-size:0.78rem;font-weight:700;margin-left:4px;opacity:${i === deployModelIdx ? '1' : '0.65'};">${fmtPct(ms.testAcc)}</span>`;
+    btn.onclick = () => {
+      if (deployDone) return;
+      deployModelIdx = i;
+      renderDeployPicker();
+      setPulse('deploy-btn');
+    };
+    c.appendChild(btn);
+  });
+}
+
+function startDeploy() {
+  if (busy || deployDone || deployModelIdx < 0) return;
+  busy = true;
+  clearPulse();
+  document.getElementById('deploy-btn').disabled = true;
+  document.getElementById('deploy-btn').textContent = 'Deploying…';
+  document.getElementById('deploy-picker').querySelectorAll('button').forEach(b => b.disabled = true);
+
+  const ms = mSt[deployModelIdx];
+  // Test was never peeked at — real-world accuracy should land very close to test
+  // Real-world guaranteed within ±5% of test estimate (test was never peeked at)
+  const noise   = (Math.random() - 0.5) * 0.10;
+  const realAcc = clamp(ms.testAcc + noise,
+    Math.max(0.33, ms.testAcc - 0.05),
+    Math.min(0.97, ms.testAcc + 0.05));
+
+  const streamEl = document.getElementById('deploy-stream');
+  streamEl.style.display = 'grid';
+  streamEl.innerHTML = '';
+  const dots = Array.from({ length: TEST_SIZE }, () => {
+    const d = document.createElement('div');
+    d.className = 'deploy-dot';
+    streamEl.appendChild(d);
+    return d;
+  });
+
+  let correct = 0, idx = 0;
+  const tick = setInterval(() => {
+    if (idx === TEST_SIZE) {
+      clearInterval(tick);
+      finalizeDeploy(ms.testAcc, realAcc);
+      return;
+    }
+    const hit = Math.random() < realAcc;
+    if (hit) correct++;
+    dots[idx].className = 'deploy-dot ' + (hit ? 'correct' : 'wrong');
+    idx++;
+  }, 130);
+}
+
+function finalizeDeploy(testEst, realAcc) {
+  const gap   = Math.round((testEst - realAcc) * 100);
+  const close = Math.abs(gap) <= 5;
+
+  const cmpEl = document.getElementById('deploy-compare');
+  cmpEl.innerHTML = `
+    <div class="cmp-card">
+      <div class="cmp-card-label">Test accuracy</div>
+      <div class="cmp-val cmp-test">${fmtPct(testEst)}</div>
+      <div style="font-size:0.78rem;color:var(--muted);margin-top:6px;">your prediction</div>
+    </div>
+    <div class="cmp-card">
+      <div class="cmp-card-label">Real-world accuracy</div>
+      <div class="cmp-val ${close ? 'cmp-real-good' : 'cmp-real-bad'}">${fmtPct(realAcc)}</div>
+      <div style="font-size:0.78rem;color:var(--muted);margin-top:6px;">${
+        Math.abs(gap) === 0 ? 'exact match'
+        : gap > 0 ? gap + '% below estimate'
+        : Math.abs(gap) + '% above estimate'
+      }</div>
+    </div>`;
+
+  const msg = document.getElementById('outcome-msg');
+  if (close) {
+    msg.className = 'outcome-msg outcome-good';
+    msg.innerHTML = `✅ <strong>Close match.</strong> Because you never used the test set to guide your decisions, it gave you an honest prediction — and the real world confirmed it. This is what validation sets are for.`;
+  } else {
+    msg.className = 'outcome-msg outcome-warn';
+    msg.innerHTML = `⚠️ <strong>${Math.abs(gap)}% gap.</strong> Some variation is normal — test sets are samples, not guarantees. But the key thing: you never peeked, so at least this gap isn't because you over-tuned to the test.`;
+  }
+
+  document.getElementById('deploy-result-section').style.display = 'block';
+
+  State.setLevel(3, { completed: true, bestAccuracy: realAcc });
+  Log.event('l3_deploy', {
+    model: deployModelIdx, modelName: getLabels()[deployModelIdx],
+    testEst, realAcc,
+  });
+
+  deployDone = true;
+  busy = false;
+  updateBanner();
+
+  setTimeout(() => {
+    document.getElementById('continue-row').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, 700);
+}
+
+function goNext() {
+  window.location.href = 'reflection.html';
 }
 
 // ── Progress bar ──────────────────────────────────────────────────────────────
@@ -873,9 +1163,12 @@ function updateBanner() {
   const deployReady  = document.getElementById('deploy-section').style.display !== 'none';
 
   let emoji, html;
-  if (deployReady && lockedCount >= 3) {
+  if (deployDone) {
+    emoji = '✅';
+    html  = `<strong>Model deployed.</strong> See how closely real-world accuracy matched your test score — that's the payoff of keeping the test set honest. When you're ready, hit Continue.`;
+  } else if (deployReady && lockedCount >= 3) {
     emoji = '🚀';
-    html  = `<strong>You've unlocked deploy.</strong> Look at the leaderboard to compare your models, then scroll down to choose one and ship it.`;
+    html  = `<strong>You've unlocked deploy.</strong> Scroll down, pick the model you trust most, and ship it.`;
   } else if (lockedCount >= 1) {
     const need = Math.max(0, 3 - lockedCount);
     emoji = '🔒';
@@ -943,12 +1236,12 @@ function dismissInterstitial() {
 function doReset() {
   document.getElementById('reset-overlay').style.display = 'none';
   splitLocked = false; selModel = 0; busy = false; pendingRevealIdx = -1;
-  trainPt = 72;
+  trainPt = 72; deployModelIdx = -1; deployDone = false;
   mSt.forEach(m => Object.assign(m, {
     hp1:50, hp2:50, trained:false, lockedIn:false,
     trainAcc:null, valAcc:null, testAcc:null, lockedHp1:null, lockedHp2:null,
+    runs:[],
   }));
-  initBlockClasses();
 
   const slider = document.getElementById('split-slider');
   slider.value = 72; slider.disabled = false; slider.style.opacity = '';

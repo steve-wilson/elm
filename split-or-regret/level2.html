@@ -160,16 +160,6 @@
     <div class="split-container">
       <div class="split-row">
         <span class="split-lbl lbl-train">Train <span class="split-ct" id="train-ct"></span></span>
-        <div id="class-legend" style="display:flex;gap:12px;font-size:0.72rem;color:var(--muted);align-items:center;">
-          <span style="display:flex;align-items:center;gap:4px;">
-            <svg width="9" height="9" viewBox="0 0 10 10" style="color:var(--block-selected);flex-shrink:0;"><rect fill="currentColor" width="10" height="10"/></svg>
-            A: <span id="legend-a-count">—</span>
-          </span>
-          <span style="display:flex;align-items:center;gap:4px;">
-            <svg width="9" height="9" viewBox="0 0 10 10" style="color:var(--block-selected);flex-shrink:0;"><rect fill="currentColor" width="10" height="10"/><circle fill="var(--surface)" cx="5" cy="5" r="2.8"/></svg>
-            B: <span id="legend-b-count">—</span>
-          </span>
-        </div>
         <span class="split-lbl lbl-test">Test <span class="split-ct" id="test-ct"></span></span>
       </div>
       <input type="range" id="split-slider" min="10" max="110" value="96">
@@ -314,13 +304,6 @@ document.addEventListener('click', () => {
 const TOTAL = 120;
 
 const SVG_A = `<svg viewBox="0 0 10 10"><rect class="block-fill" width="10" height="10"/></svg>`;
-const SVG_B = `<svg viewBox="0 0 10 10"><rect class="block-fill" width="10" height="10"/><circle class="block-hole" cx="5" cy="5" r="2.8"/></svg>`;
-
-let blockClasses = [];
-function initBlockClasses() {
-  blockClasses = Array.from({length: TOTAL}, () => Math.random() < 0.5 ? 'A' : 'B');
-}
-initBlockClasses();
 
 const MODEL_SETS = {
   greek:     ['α','β','γ','δ','ε','ζ'],
@@ -372,7 +355,6 @@ peekCount = lvl2saved.testPeekCount || 0;
 
 renderGrid();
 updateCounts();
-updateClassLegend();
 renderModelBtns();
 updateBanner();
 setPulse('split-slider');
@@ -405,21 +387,15 @@ function showHoverTip(text, x, y) {
 }
 function hideHoverTip() { document.getElementById('tooltip').style.display = 'none'; }
 
-function updateClassLegend() {
-  const countA = blockClasses.filter(c => c === 'A').length;
-  document.getElementById('legend-a-count').textContent = countA;
-  document.getElementById('legend-b-count').textContent = TOTAL - countA;
-}
-
 function renderGrid() {
   const g = document.getElementById('data-grid');
   g.innerHTML = '';
   for (let i = 0; i < TOTAL; i++) {
     const b = document.createElement('div');
     b.className = 'block ' + (i < splitPt ? 'train' : 'test');
-    b.innerHTML = blockClasses[i] === 'A' ? SVG_A : SVG_B;
+    b.innerHTML = SVG_A;
     b.addEventListener('mouseenter', e => {
-      showHoverTip(`${i < splitPt ? 'Train' : 'Test'} · ID ${i}: Class ${blockClasses[i]}`, e.clientX, e.clientY);
+      showHoverTip(`${i < splitPt ? 'Train' : 'Test'} · ID ${i}`, e.clientX, e.clientY);
     });
     b.addEventListener('mouseleave', hideHoverTip);
     g.appendChild(b);
@@ -959,8 +935,6 @@ function startOver() {
   round1 = null; round2 = null; isRound2 = false; originalSplit = null;
   if (splitLocked) unlockSplit();
   l2Runs = []; l2RunCnt = 0;
-  initBlockClasses();
-  updateClassLegend();
   mSt.forEach(m => { m.trained=false; m.trainAcc=null; m.testAcc=null; m.tested=false; });
 
   State.setLevel(2, { started: false, completed: false, testPeekCount: 0 });

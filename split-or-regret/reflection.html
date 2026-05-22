@@ -11,15 +11,375 @@
   } catch(e) {}
 </script>
 <link rel="stylesheet" href="css/shared.css">
+<style>
+  .refl-section { margin-bottom: 40px; }
+
+  .section-header {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+  }
+  .section-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent); color: white;
+    font-size: 0.85rem; font-weight: 800; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .section-title { font-size: 1.05rem; font-weight: 700; }
+
+  .recap-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 20px; margin-bottom: 16px;
+  }
+  .recap-stats {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;
+  }
+  .stat-item {
+    background: var(--bg); border-radius: calc(var(--radius) / 1.5); padding: 10px 14px;
+  }
+  .stat-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--muted); margin-bottom: 5px;
+  }
+  .stat-val {
+    font-size: 1.5rem; font-weight: 800; line-height: 1; color: var(--text);
+  }
+  .stat-val.val-model { font-size: 1.2rem; color: var(--accent); }
+  .stat-val.val-train { color: var(--train); }
+  .stat-val.val-real  { color: var(--test); }
+  .stat-val.val-test  { color: var(--accent); }
+  .stat-val.val-val   { color: var(--val, var(--accent)); }
+  .stat-val.val-gap   { color: var(--muted); }
+
+  /* --val mirrors level3's validation colour */
+  .theme-clean { --val: #6366f1; }
+  .theme-dark  { --val: #a78bfa; }
+  .theme-retro { --val: #00bfff; }
+  .theme-candy { --val: #a78bfa; }
+
+  .question-block { margin-top: 4px; }
+  .question-text {
+    font-size: 0.95rem; line-height: 1.65; color: var(--text); margin-bottom: 12px;
+  }
+  .reflection-textarea {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 16px; color: var(--text);
+    font-family: var(--font); font-size: 0.9rem; line-height: 1.6;
+    resize: vertical; min-height: 110px; transition: border-color 0.2s;
+  }
+  .reflection-textarea:focus { outline: none; border-color: var(--accent); }
+  .char-hint { font-size: 0.75rem; color: var(--muted); margin-top: 5px; min-height: 1.1em; }
+  .char-hint.met { color: var(--train); }
+
+  .feedback-note {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 14px;
+    font-size: 0.82rem; color: var(--muted); line-height: 1.5; margin-bottom: 12px;
+  }
+
+  #submit-area {
+    margin-top: 8px; padding-top: 24px; border-top: 1px solid var(--border);
+    text-align: center;
+  }
+  #submit-btn { min-width: 180px; }
+  #submit-btn:disabled {
+    opacity: 0.4; cursor: not-allowed;
+    transform: none !important; animation: none; box-shadow: none;
+  }
+
+  @media (max-width: 480px) {
+    .stat-val { font-size: 1.25rem; }
+    .stat-val.val-model { font-size: 1rem; }
+  }
+</style>
 </head>
 <body>
-<div class="placeholder-page">
-  <h1>Reflection</h1>
-  <p>Quiz and reflection questions — coming soon.</p>
-  <a href="level3.html" style="color:var(--accent);">← Back to Level 3</a>
+
+<div id="app">
+  <header>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <h1>Split or Regret</h1>
+      <span class="level-badge">Reflection</span>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ── SECTION 1: Level 1 recap ── -->
+    <div class="refl-section">
+      <div class="section-header">
+        <div class="section-num">1</div>
+        <div class="section-title">Level 1 — Your starting point</div>
+      </div>
+
+      <div class="recap-card">
+        <div class="section-label" style="margin-bottom:10px;">Your Level 1 results</div>
+        <div class="recap-stats" id="l1-stats"></div>
+      </div>
+
+      <div class="question-block">
+        <p class="question-text">In Level 1, you trained a model and then deployed it to see how it performed on data it had never seen. What did you notice about the gap between your training accuracy and your real-world deployed performance? Why do you think that gap existed?</p>
+        <textarea class="reflection-textarea" id="q1" placeholder="Type your answer here…"
+          oninput="checkChars(this, 'q1-hint'); updateSubmitBtn()"></textarea>
+        <div class="char-hint" id="q1-hint"></div>
+      </div>
+    </div>
+
+    <!-- ── SECTION 2: Level 2 recap ── -->
+
+    <div class="refl-section">
+      <div class="section-header">
+        <div class="section-num">2</div>
+        <div class="section-title">Level 2 — Adding a test set</div>
+      </div>
+
+      <div class="recap-card">
+        <div class="section-label" style="margin-bottom:10px;">Your Level 2 results</div>
+        <div class="recap-stats" id="l2-stats"></div>
+      </div>
+
+      <div class="question-block">
+        <p class="question-text">In Level 2, you held back a test set and evaluated your model on it before deploying. How did this change your confidence in your model's real-world performance compared to Level 1? Did anything still surprise you after deploying?</p>
+        <textarea class="reflection-textarea" id="q2" placeholder="Type your answer here…"
+          oninput="checkChars(this, 'q2-hint'); updateSubmitBtn()"></textarea>
+        <div class="char-hint" id="q2-hint"></div>
+      </div>
+    </div>
+
+    <!-- ── SECTION 3: Level 3 recap ── -->
+
+    <div class="refl-section">
+      <div class="section-header">
+        <div class="section-num">3</div>
+        <div class="section-title">Level 3 — Validation and hyperparameter tuning</div>
+      </div>
+
+      <div class="recap-card">
+        <div class="section-label" style="margin-bottom:10px;">Your Level 3 results</div>
+        <div class="recap-stats" id="l3-stats"></div>
+      </div>
+
+      <div class="question-block">
+        <p class="question-text">In Level 3, you had a validation set to experiment with and a locked test set you could only reveal once per model. Describe how you used the validation set to make decisions. Why is it important that the test set could only be revealed once?</p>
+        <textarea class="reflection-textarea" id="q3" placeholder="Type your answer here…"
+          oninput="checkChars(this, 'q3-hint'); updateSubmitBtn()"></textarea>
+        <div class="char-hint" id="q3-hint"></div>
+      </div>
+    </div>
+
+    <!-- ── SECTION 4: Synthesis ── -->
+    <div class="refl-section">
+      <div class="section-header">
+        <div class="section-num">4</div>
+        <div class="section-title">Putting it together</div>
+      </div>
+
+      <div class="question-block">
+        <p class="question-text">Imagine a colleague tells you they trained a model, tuned it until it hit 95% accuracy, and are ready to ship it. Based on what you experienced in this game, what questions would you ask them before signing off?</p>
+        <textarea class="reflection-textarea" id="q4" placeholder="Type your answer here…"
+          oninput="checkChars(this, 'q4-hint'); updateSubmitBtn()"></textarea>
+        <div class="char-hint" id="q4-hint"></div>
+      </div>
+    </div>
+
+    <!-- ── SECTION 5: Feedback ── -->
+    <div class="refl-section">
+      <div class="section-header">
+        <div class="section-num">5</div>
+        <div class="section-title">Game feedback</div>
+      </div>
+
+      <div class="feedback-note">
+        This question won't affect your grade — it helps us improve the game for future semesters.
+      </div>
+
+      <div class="question-block">
+        <p class="question-text">How was your experience with this game? What worked well, what was confusing, and what would you change?</p>
+        <textarea class="reflection-textarea" id="q5" placeholder="Optional — any feedback is welcome."
+          style="min-height:90px;"></textarea>
+      </div>
+    </div>
+
+    <!-- ── SECTION 6: Submit ── -->
+    <div id="submit-area">
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:16px;" id="submit-hint">
+        Answer all four questions above to continue.
+      </p>
+      <button class="btn btn-next-stage" id="submit-btn" onclick="submitReflection()" disabled>
+        Continue →
+      </button>
+    </div>
+
+  </main>
 </div>
+
+<div id="tooltip"></div>
+
 <script src="js/state.js"></script>
+<script src="js/log.js"></script>
 <script src="js/themes.js"></script>
-<script>Themes.fromState();</script>
+<script>
+Themes.fromState();
+
+const MODEL_SETS = {
+  greek:     ['α','β','γ','δ','ε','ζ'],
+  animals:   ['🦊','🐺','🐻','🦅','🦈','🐯'],
+  zodiac:    ['♈','♉','♊','♋','♌','♍'],
+  realistic: ['SVM','RandForest','GradBoost','NeuralNet','KNN','NaiveBayes'],
+};
+
+function getModelName(idx) {
+  const set = State.get('modelSet') || 'greek';
+  return (MODEL_SETS[set] || MODEL_SETS.greek)[idx] ?? '—';
+}
+
+function makeStat(label, val, valClass) {
+  return `<div class="stat-item">
+    <div class="stat-label">${label}</div>
+    <div class="stat-val ${valClass || ''}">${val}</div>
+  </div>`;
+}
+
+function makeStatSub(label, val, sub, valClass) {
+  return `<div class="stat-item">
+    <div class="stat-label">${label}</div>
+    <div class="stat-val ${valClass || ''}">${val}</div>
+    ${sub !== '—' ? `<div style="font-size:0.72rem;color:var(--muted);margin-top:4px;">${sub}</div>` : ''}
+  </div>`;
+}
+
+// ── Level 1 data ──────────────────────────────────────────────────────────────
+function buildL1Stats() {
+  const events  = Log.getAll();
+  const deplEv  = events.filter(e => e.type === 'deploy_result' && e.level === 1).slice(-1)[0];
+  const trainEv = events.filter(e => e.type === 'train_run'     && e.level === 1)
+                        .sort((a, b) => b.trainAccuracy - a.trainAccuracy)[0];
+
+  const model    = deplEv  ? (deplEv.deployedModelName ?? '—') : '—';
+  const trainPct = trainEv ? trainEv.trainAccuracy + '%' : '—';
+  const realPct  = deplEv  ? deplEv.deployAccuracy  + '%' : '—';
+  const gapVal   = (trainEv && deplEv)
+    ? '−' + (trainEv.trainAccuracy - deplEv.deployAccuracy) + '%' : '—';
+
+  document.getElementById('l1-stats').innerHTML =
+    makeStat('Model deployed',      model,    'val-model') +
+    makeStat('Training accuracy',   trainPct, 'val-train') +
+    makeStat('Real-world accuracy', realPct,  'val-real')  +
+    makeStat('Gap',                 gapVal,   'val-gap');
+}
+
+buildL1Stats();
+
+// ── Level 2 data ──────────────────────────────────────────────────────────────
+function buildL2Stats() {
+  const events = Log.getAll();
+  const deplEv = events.filter(e => e.type === 'l2_deploy').slice(-1)[0];
+
+  let model = '—', trainPct = '—', testPct = '—', realPct = '—';
+
+  if (deplEv) {
+    model    = getModelName(deplEv.deployMdl);
+    testPct  = Math.round(deplEv.testEst  * 100) + '%';
+    realPct  = Math.round(deplEv.realAcc  * 100) + '%';
+
+    const trainEv = events
+      .filter(e => e.type === 'l2_train' && e.model === deplEv.deployMdl)
+      .slice(-1)[0];
+    if (trainEv) trainPct = Math.round(trainEv.trainAcc * 100) + '%';
+  }
+
+  document.getElementById('l2-stats').innerHTML =
+    makeStat('Model deployed',    model,    'val-model') +
+    makeStat('Train accuracy',    trainPct, 'val-train') +
+    makeStat('Test accuracy',     testPct,  'val-test')  +
+    makeStat('Real-world accuracy', realPct, 'val-real');
+}
+
+buildL2Stats();
+
+// ── Level 3 data ──────────────────────────────────────────────────────────────
+function buildL3Stats() {
+  const events = Log.getAll();
+  const deplEv = events.filter(e => e.type === 'l3_deploy').slice(-1)[0];
+
+  let modelName = '—', hpStr = '—', valPct = '—', testPct = '—', realPct = '—';
+
+  if (deplEv) {
+    modelName = deplEv.modelName || getModelName(deplEv.model);
+    testPct   = Math.round(deplEv.testEst * 100) + '%';
+    realPct   = Math.round(deplEv.realAcc * 100) + '%';
+
+    const revealEv = events
+      .filter(e => e.type === 'l3_reveal_test' && e.model === deplEv.model)
+      .slice(-1)[0];
+    if (revealEv) {
+      valPct = Math.round(revealEv.valAcc * 100) + '%';
+      hpStr  = revealEv.hp2 != null
+        ? `HP1: ${revealEv.hp1} · HP2: ${revealEv.hp2}`
+        : `HP1: ${revealEv.hp1}`;
+    }
+  }
+
+  document.getElementById('l3-stats').innerHTML =
+    makeStatSub('Model deployed',      modelName, hpStr,   'val-model') +
+    makeStat('Validation accuracy',    valPct,             'val-val')   +
+    makeStat('Test accuracy',          testPct,            'val-test')  +
+    makeStat('Real-world accuracy',    realPct,            'val-real');
+}
+
+buildL3Stats();
+
+// ── Character count hints ─────────────────────────────────────────────────────
+const MIN_CHARS = 30;
+
+function checkChars(el, hintId) {
+  const n    = el.value.trim().length;
+  const hint = document.getElementById(hintId);
+  if (n >= MIN_CHARS) {
+    hint.textContent = '✓';
+    hint.className   = 'char-hint met';
+  } else {
+    hint.textContent = (MIN_CHARS - n) + ' more characters needed';
+    hint.className   = 'char-hint';
+  }
+}
+
+// ── Submit ────────────────────────────────────────────────────────────────────
+const GRADED_IDS = ['q1', 'q2', 'q3', 'q4'];
+
+function updateSubmitBtn() {
+  const allMet = GRADED_IDS.every(id => {
+    const el = document.getElementById(id);
+    return el && el.value.trim().length >= MIN_CHARS;
+  });
+  const btn  = document.getElementById('submit-btn');
+  const hint = document.getElementById('submit-hint');
+  btn.disabled = !allMet;
+  if (allMet) {
+    hint.textContent = 'All questions answered — ready to continue.';
+    hint.style.color = 'var(--train)';
+  } else {
+    const remaining = GRADED_IDS.filter(id => {
+      const el = document.getElementById(id);
+      return !el || el.value.trim().length < MIN_CHARS;
+    }).length;
+    hint.textContent = remaining + ' question' + (remaining !== 1 ? 's' : '') + ' still need' + (remaining === 1 ? 's' : '') + ' more to answer.';
+    hint.style.color = '';
+  }
+}
+
+function submitReflection() {
+  State.set('reflection', {
+    completed: true,
+    answers: {
+      q1: document.getElementById('q1').value.trim(),
+      q2: document.getElementById('q2').value.trim(),
+      q3: document.getElementById('q3').value.trim(),
+      q4: document.getElementById('q4').value.trim(),
+      q5: document.getElementById('q5').value.trim(),
+    },
+  });
+  Log.event('reflection_complete', {});
+  window.location.href = 'done.html';
+}
+</script>
 </body>
 </html>

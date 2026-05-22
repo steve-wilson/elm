@@ -11,22 +11,100 @@
   } catch(e) {}
 </script>
 <link rel="stylesheet" href="css/shared.css">
+<style>
+  .done-wrap {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; min-height: calc(100vh - 57px);
+    padding: 40px 24px; text-align: center;
+  }
+  .done-title {
+    font-size: 1.8rem; font-weight: 800; margin-bottom: 10px;
+  }
+  .done-sub {
+    font-size: 0.97rem; color: var(--muted); line-height: 1.6;
+    max-width: 420px; margin-bottom: 32px;
+  }
+  .done-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px 28px;
+    width: 100%; max-width: 400px; text-align: left;
+  }
+  .name-label {
+    display: block; font-size: 0.82rem; font-weight: 700;
+    color: var(--muted); margin-bottom: 8px; text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .name-input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 14px; color: var(--text);
+    font-family: var(--font); font-size: 0.95rem; margin-bottom: 20px;
+    transition: border-color 0.2s;
+  }
+  .name-input:focus { outline: none; border-color: var(--accent); }
+  .done-actions {
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .btn-download {
+    background: var(--train); color: white;
+    padding: 12px 24px; font-size: 0.95rem;
+  }
+  .btn-freeplay {
+    background: none; border: 1px solid var(--border);
+    color: var(--text); padding: 11px 24px; font-size: 0.95rem;
+  }
+  .btn-freeplay:hover { border-color: var(--accent); color: var(--accent); }
+  .download-note {
+    font-size: 0.75rem; color: var(--muted); margin-top: 8px; text-align: center;
+  }
+</style>
 </head>
 <body>
-<div class="placeholder-page">
-  <h1>You're done!</h1>
-  <p>Download your session log to submit with your assignment.</p>
-  <button class="btn btn-train" onclick="downloadLog()" style="margin-top:8px;">Download Log</button>
-  <a href="index.html" style="color:var(--accent);margin-top:8px;">Start over</a>
+
+<div id="app">
+  <header>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <h1>Split or Regret</h1>
+      <span class="level-badge" style="background:var(--train);">Done</span>
+    </div>
+  </header>
+
+  <div class="done-wrap">
+    <div class="done-title">You're done!</div>
+    <p class="done-sub">Thanks for playing Split or Regret. Enter your name below, then download your session log to submit with your assignment.</p>
+
+    <div class="done-card">
+      <label class="name-label" for="student-name">Your name (for submission)</label>
+      <input class="name-input" id="student-name" type="text"
+        placeholder="First Last" autocomplete="name">
+
+      <div class="done-actions">
+        <button class="btn btn-download" onclick="downloadLog()">Download log</button>
+        <button class="btn btn-freeplay" onclick="goFreeplay()">Continue to free play →</button>
+      </div>
+      <p class="download-note" id="download-note"></p>
+    </div>
+  </div>
 </div>
+
 <script src="js/state.js"></script>
 <script src="js/log.js"></script>
 <script src="js/themes.js"></script>
 <script>
-  Themes.fromState();
-  function downloadLog() {
-    Log.download();
+Themes.fromState();
+
+function downloadLog() {
+  const name = document.getElementById('student-name').value.trim();
+  if (name) {
+    Log.event('submission', { studentName: name });
+    State.set('studentName', name);
   }
+  Log.download();
+  document.getElementById('download-note').textContent = 'Log downloaded.';
+}
+
+function goFreeplay() {
+  window.location.href = 'freeplay.html';
+}
 </script>
 </body>
 </html>
