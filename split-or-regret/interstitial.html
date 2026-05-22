@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Split or Regret — Before Level 2</title>
+<script>
+  try {
+    const s = JSON.parse(localStorage.getItem('sor_state') || '{}');
+    document.documentElement.className = 'theme-' + (s.theme || 'clean');
+  } catch(e) {}
+</script>
+<link rel="stylesheet" href="css/shared.css">
+<style>
+  body {
+    min-height: 100vh; display: flex; align-items: center;
+    justify-content: center; background: rgba(0,0,0,0.72); padding: 24px;
+  }
+
+  .card {
+    background: white; border-radius: 14px; padding: 40px 44px;
+    max-width: 540px; width: 100%;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  /* ── Progress dots ── */
+  .progress { display: flex; gap: 8px; justify-content: center; margin-bottom: 32px; }
+  .pdot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #e5e7eb; transition: background 0.3s;
+  }
+  .pdot.active { background: #3b82f6; }
+  .pdot.done   { background: #10b981; }
+
+  /* ── Question ── */
+  .q-text {
+    font-size: 1.15rem; font-weight: 800; color: #1a1a2e;
+    line-height: 1.45; margin-bottom: 22px;
+  }
+
+  .options { display: flex; flex-direction: column; gap: 10px; }
+
+  .opt {
+    padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
+    background: white; cursor: pointer; text-align: left;
+    font-size: 0.92rem; line-height: 1.5; color: #374151;
+    transition: border-color 0.15s, background 0.15s; font-family: inherit;
+  }
+  .opt:hover:not(:disabled) { border-color: #93c5fd; background: #eff6ff; }
+  .opt.correct  { border-color: #10b981; background: #f0fdf4; color: #065f46; }
+  .opt.wrong    { border-color: #f87171; background: #fef2f2; color: #991b1b; }
+
+  .feedback {
+    display: none; margin-top: 14px; padding: 11px 14px;
+    border-radius: 8px; font-size: 0.88rem; line-height: 1.6;
+  }
+  .feedback.correct { background: #f0fdf4; border: 1px solid #bbf7d0; color: #065f46; }
+  .feedback.wrong   { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+
+  .next-btn {
+    display: none; margin-top: 20px; width: 100%; padding: 13px;
+    background: #3b82f6; color: white; border: none; border-radius: 8px;
+    font-size: 1rem; font-weight: 700; cursor: pointer;
+    transition: opacity 0.2s; font-family: inherit;
+  }
+  .next-btn:hover { opacity: 0.88; }
+
+  /* ── Conclusion ── */
+  #conclusion { display: none; }
+  #conclusion h2 {
+    font-size: 1.4rem; font-weight: 800; color: #1a1a2e; margin-bottom: 18px;
+  }
+  #conclusion p {
+    color: #374151; font-size: 0.97rem; line-height: 1.7; margin-bottom: 14px;
+  }
+  .key-term {
+    background: #eff6ff; border-left: 4px solid #3b82f6;
+    padding: 11px 16px; border-radius: 0 8px 8px 0;
+    font-size: 0.95rem; font-weight: 600; color: #1e40af;
+    margin: 18px 0 22px; line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="progress" id="progress"></div>
+
+  <div id="questions-container">
+    <div class="q-text" id="q-text"></div>
+    <div class="options" id="options"></div>
+    <div class="feedback" id="feedback"></div>
+    <button class="next-btn" id="next-btn" onclick="nextStep()"></button>
+  </div>
+
+  <div id="conclusion">
+    <h2>The test set</h2>
+    <p>Before training starts, you set aside a slice of your data. The model never touches it during training. Afterward, you evaluate on those held-out examples — and because the model has never seen them, the result is an honest estimate of real-world performance.</p>
+    <div class="key-term">We don't use all of the data for training. We "hold out" some of it for evaluation only.</div>
+    <button class="next-btn" style="display:block;" onclick="goLevel2()">Start Level 2 →</button>
+  </div>
+</div>
+
+<script>
+const QUESTIONS = [
+  {
+    q: "In Level 1, your model looked great on training data — but stumbled when it met the real world. What was the core problem?",
+    opts: [
+      {
+        text: "The model wasn't powerful enough",
+        correct: false,
+        feedback: "You had six different models to try — power wasn't the issue. Think about what information was available before you hit Deploy."
+      },
+      {
+        text: "The model had only ever seen training data, so there was no way to preview how it would handle new examples",
+        correct: true,
+        feedback: "Exactly. The model memorized what it practiced on. You had no way to know how it would do on genuinely new examples until it was already out in the world."
+      },
+      {
+        text: "There wasn't enough training data",
+        correct: false,
+        feedback: "Data size helps, but even with more training data you'd face the same blind spot. The missing piece wasn't more data — it was a way to test before shipping."
+      },
+    ]
+  },
+  {
+    q: "You can't collect more data right now. How could you get a preview of real-world performance before deploying?",
+    opts: [
+      {
+        text: "Train the model multiple times and average the results",
+        correct: false,
+        feedback: "Averaging over more runs doesn't create new information — you'd still only be measuring performance on examples the model already trained on."
+      },
+      {
+        text: "Set aside some of the data before training, so the model never sees it",
+        correct: true,
+        feedback: "Yes. If the model never trains on those examples, they're genuinely new to it — a stand-in for the real world."
+      },
+      {
+        text: "Use a more complex model",
+        correct: false,
+        feedback: "A more complex model might fit the training data better, but it still wouldn't tell you how it performs on examples it has never seen."
+      },
+      {
+        text: "Look more carefully at the training accuracy",
+        correct: false,
+        feedback: "Training accuracy only tells you how well the model memorized what it already saw — not how it handles new data."
+      },
+    ]
+  },
+  {
+    q: "You've held back some data before training. The model has never seen it. What should you use it for?",
+    opts: [
+      {
+        text: "Train a second model on it",
+        correct: false,
+        feedback: "Then it's not held out anymore — you'd have the same blind spot you started with."
+      },
+      {
+        text: "Evaluate the trained model on examples it has never seen",
+        correct: true,
+        feedback: "That held-out slice is your test set — a fair, unseen benchmark that gives you an honest estimate of real-world performance."
+      },
+      {
+        text: "Discard it to keep things simple",
+        correct: false,
+        feedback: "That just leaves you with less data and the same blind spot. Held-out data is valuable — it's the only honest look you get before deployment."
+      },
+    ]
+  },
+];
+
+let currentQ = 0;
+
+function renderProgress() {
+  const el = document.getElementById('progress');
+  el.innerHTML = '';
+  QUESTIONS.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'pdot' + (i < currentQ ? ' done' : i === currentQ ? ' active' : '');
+    el.appendChild(d);
+  });
+}
+
+function renderQuestion() {
+  const q = QUESTIONS[currentQ];
+  document.getElementById('q-text').textContent = q.q;
+
+  const optEl = document.getElementById('options');
+  optEl.innerHTML = '';
+  q.opts.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'opt';
+    btn.textContent = opt.text;
+    btn.onclick = () => selectAnswer(opt, btn);
+    optEl.appendChild(btn);
+  });
+
+  const fb = document.getElementById('feedback');
+  fb.style.display = 'none';
+  fb.textContent = '';
+
+  const nb = document.getElementById('next-btn');
+  nb.style.display = 'none';
+
+  renderProgress();
+}
+
+function selectAnswer(opt, btn) {
+  const fb = document.getElementById('feedback');
+  fb.textContent = opt.feedback;
+
+  if (opt.correct) {
+    // Lock all options, show green
+    document.querySelectorAll('.opt').forEach(b => { b.onclick = null; b.disabled = true; });
+    btn.classList.add('correct');
+    fb.className = 'feedback correct';
+    fb.style.display = 'block';
+    const nb = document.getElementById('next-btn');
+    nb.textContent = currentQ < QUESTIONS.length - 1 ? 'Next →' : 'See the takeaway →';
+    nb.style.display = 'block';
+  } else {
+    // Mark this option wrong, leave others clickable
+    btn.classList.add('wrong');
+    btn.onclick = null;
+    btn.disabled = true;
+    fb.className = 'feedback wrong';
+    fb.style.display = 'block';
+  }
+}
+
+function nextStep() {
+  currentQ++;
+  if (currentQ < QUESTIONS.length) {
+    renderQuestion();
+  } else {
+    document.getElementById('questions-container').style.display = 'none';
+    document.getElementById('conclusion').style.display = 'block';
+    document.querySelectorAll('.pdot').forEach(d => { d.className = 'pdot done'; });
+  }
+}
+
+function goLevel2() {
+  window.location.href = 'level2.html';
+}
+
+renderQuestion();
+</script>
+</body>
+</html>

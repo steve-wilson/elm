@@ -11,15 +11,1002 @@
   } catch(e) {}
 </script>
 <link rel="stylesheet" href="css/shared.css">
+<style>
+  /* ── Validation colour (per-theme, only used in level3) ── */
+  .theme-clean { --val: #6366f1; }
+  .theme-dark  { --val: #a78bfa; }
+  .theme-retro { --val: #00bfff; }
+  .theme-candy { --val: #a78bfa; }
+
+  /* ── Interstitial ── */
+  #interstitial {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.72);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200; padding: 24px;
+  }
+  .interstitial-card {
+    background: white; border-radius: 14px; padding: 40px 44px;
+    max-width: 540px; width: 100%;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  .interstitial-card h2 { font-size: 1.4rem; font-weight: 800; color: #1a1a2e; margin-bottom: 20px; }
+  .interstitial-card p  { color: #374151; font-size: 0.97rem; line-height: 1.7; margin-bottom: 16px; }
+  .interstitial-card p:last-of-type { margin-bottom: 28px; }
+  .interstitial-go {
+    display: block; width: 100%; padding: 13px;
+    background: #3b82f6; color: white; border: none; border-radius: 8px;
+    font-size: 1rem; font-weight: 700; cursor: pointer;
+    transition: opacity 0.2s; font-family: inherit;
+  }
+  .interstitial-go:hover { opacity: 0.88; }
+
+  /* ── Split container ── */
+  .split-container {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
+  }
+
+  /* ── Three-zone header row ── */
+  .split-zones { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .zone-lbl { font-size: 0.82rem; font-weight: 700; }
+  .zone-lbl .split-ct { font-size: 0.78rem; font-weight: 400; color: var(--muted); margin-left: 3px; }
+  .lbl-train { color: var(--train); }
+  .lbl-val   { color: var(--val); }
+  .lbl-test  { color: var(--test); display: flex; align-items: center; gap: 4px; }
+
+  /* ── Proportional split bar ── */
+  .split-bar-track { display: flex; height: 5px; border-radius: 3px; overflow: hidden; margin-bottom: 10px; gap: 2px; }
+  .split-bar-seg { transition: flex 0.15s ease; min-width: 0; }
+  #bar-train { background: var(--train); }
+  #bar-val   { background: var(--val); }
+  #bar-test  { background: var(--test); opacity: 0.5; }
+
+  /* ── Sliders ── */
+  #split-slider { width: 100%; margin: 4px 0 8px; accent-color: var(--accent); cursor: pointer; }
+  #split-slider:disabled { opacity: 0.4; cursor: default; }
+  .split-hint { text-align: center; font-size: 0.78rem; color: var(--muted); margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+
+  /* ── Grid block colours ── */
+  #data-grid .block.train { background: transparent; color: var(--train); }
+  #data-grid .block.val   { background: transparent; color: var(--val); }
+  #data-grid .block.test  { background: transparent; color: var(--test); opacity: 0.38; }
+
+  /* ── Guide banner ── */
+  #guide-banner { border: 1px solid var(--accent); border-radius: var(--radius); padding: 12px 16px; margin-bottom: 16px; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
+  #class-legend { display: flex; gap: 12px; font-size: 0.72rem; color: var(--muted); align-items: center; }
+
+  /* ── Train sweep ── */
+  .train-sweep { position: absolute; top: 0; bottom: 0; width: 22%; background: linear-gradient(90deg, transparent, var(--sweep-color) 50%, transparent); pointer-events: none; z-index: 2; animation: train-sweep-anim ease-in-out forwards; }
+  @keyframes train-sweep-anim { from { left: -22%; } to { left: 105%; } }
+
+  /* ── Model row ── */
+  .model-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+  /* ── HP panel ── */
+  .hp-slider-row { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+  .hp-name { font-size: 0.82rem; font-weight: 600; color: var(--muted); flex-shrink: 0; width: 150px; }
+  .hp-slider { flex: 1; accent-color: var(--val); cursor: pointer; }
+  .hp-slider:disabled { opacity: 0.45; cursor: default; }
+  .hp-val { font-size: 0.82rem; font-weight: 700; width: 28px; text-align: right; }
+
+  /* ── Progress panel ── */
+  .prog-bg { margin-top: 8px; background: var(--border); border-radius: 6px; overflow: hidden; height: 12px; }
+  #prog-fill { height: 100%; background: var(--train); border-radius: 6px; width: 0%; transition: width 0.1s linear; }
+
+  /* ── Accuracy panel ── */
+  .val-bar-fill { background: var(--val) !important; }
+
+  /* ── Leaderboard ── */
+  .lb-row {
+    display: grid;
+    grid-template-columns: 26px minmax(60px, 1fr) auto 48px auto;
+    gap: 8px; align-items: center;
+    padding: 10px 12px; margin-bottom: 6px;
+    border-radius: calc(var(--radius) / 1.5);
+    border: 1px solid var(--border); background: var(--bg);
+    font-size: 0.83rem; transition: opacity 0.25s, border-color 0.2s, background 0.2s;
+  }
+  .lb-row.untrained { opacity: 0.35; }
+  .lb-row.is-locked {
+    border-color: var(--val);
+    background: color-mix(in srgb, var(--val) 7%, var(--bg));
+  }
+  .lb-rank { font-size: 0.7rem; font-weight: 700; color: var(--muted); }
+  .lb-name { font-weight: 700; }
+  .lb-hps  { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+  .lb-val  { font-weight: 700; color: var(--val); text-align: right; }
+  .lb-test { display: flex; justify-content: flex-end; align-items: center; }
+  .reveal-btn {
+    padding: 3px 9px; border: 1px solid var(--border); border-radius: calc(var(--radius) / 2);
+    background: none; color: var(--muted); font-family: var(--font);
+    font-size: 0.72rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .reveal-btn:hover { border-color: var(--val); color: var(--val); }
+  .test-score { font-weight: 700; font-size: 0.85rem; }
+  .test-score.good { color: var(--train); }
+  .test-score.ok   { color: var(--accent); }
+  .test-score.bad  { color: var(--test); }
+  .lb-dash { color: var(--muted); font-size: 0.82rem; }
+
+  @media (max-width: 600px) {
+    .hp-name { width: 110px; font-size: 0.78rem; }
+    .lb-row { grid-template-columns: 22px 1fr auto 42px auto; gap: 6px; padding: 8px 10px; }
+    .lb-hps { display: none; }
+  }
+  @media (max-width: 480px) {
+    .interstitial-card { padding: 28px 22px; }
+    .split-zones { flex-wrap: wrap; gap: 6px; }
+  }
+</style>
 </head>
 <body>
-<div class="placeholder-page">
-  <h1>Level 3</h1>
-  <p>Train/Val/Test splits — coming soon.</p>
-  <a href="level2.html" style="color:var(--accent);">← Back to Level 2</a>
+
+<!-- ── Interstitial ── -->
+<div id="interstitial">
+  <div class="interstitial-card">
+    <h2>Nice work on Level 2.</h2>
+    <p>But here's a question: what if your first model wasn't good enough? What if you wanted to try a different model, or adjust its settings?</p>
+    <p>Every time you make a decision based on your test set results — even just picking a model — you're letting it influence your choices. It's no longer a blind test.</p>
+    <p><strong>So what do you do?</strong></p>
+    <button class="interstitial-go" onclick="dismissInterstitial()">Show me →</button>
+  </div>
 </div>
+
+<!-- ── Theme overlay ── -->
+<div class="overlay" id="theme-overlay" style="display:none;">
+  <div class="picker-card">
+    <h1>Pick your theme</h1>
+    <p>You can change this any time from the header.</p>
+    <div class="picker-options">
+      <button class="picker-btn" onclick="pickTheme('clean')"><div class="swatch swatch-clean"></div>Clean</button>
+      <button class="picker-btn" onclick="pickTheme('dark')"><div class="swatch swatch-dark"></div>Dark</button>
+      <button class="picker-btn" onclick="pickTheme('retro')"><div class="swatch swatch-retro"></div>Retro</button>
+      <button class="picker-btn" onclick="pickTheme('candy')"><div class="swatch swatch-candy"></div>Candy</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Model set overlay ── -->
+<div class="overlay" id="model-overlay" style="display:none;">
+  <div class="picker-card">
+    <h1>Choose model names</h1>
+    <p>You can switch this any time from the header.</p>
+    <div class="picker-options">
+      <button class="picker-btn" onclick="pickModelSet('greek')"><div style="font-size:1.1rem;margin-bottom:4px;">α β γ δ ε ζ</div>Greek letters</button>
+      <button class="picker-btn" onclick="pickModelSet('animals')"><div style="font-size:1.1rem;margin-bottom:4px;">🦊🐺🐻🦅🦈🐯</div>Animals</button>
+      <button class="picker-btn" onclick="pickModelSet('zodiac')"><div style="font-size:1.1rem;margin-bottom:4px;">♈♉♊♋♌♍</div>Zodiac</button>
+      <button class="picker-btn" onclick="pickModelSet('realistic')"><div style="font-size:0.78rem;font-weight:700;margin-bottom:4px;">SVM · RF · GB · NN</div>Real names</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Reset confirmation modal ── -->
+<div class="overlay" id="reset-overlay" style="display:none;">
+  <div class="picker-card" style="max-width:380px;">
+    <h1 style="font-size:1.2rem;margin-bottom:10px;">Reset Level 3?</h1>
+    <p style="margin-bottom:24px;">This will randomize a new dataset and clear all your progress on this level — including any models you've locked in. Your theme and model names are kept.</p>
+    <div style="display:flex;gap:12px;justify-content:center;">
+      <button onclick="doReset()" style="padding:10px 28px;background:#ef4444;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;">Yes, reset</button>
+      <button onclick="document.getElementById('reset-overlay').style.display='none'" style="padding:10px 28px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Reveal test confirmation modal ── -->
+<div class="overlay" id="reveal-overlay" style="display:none;">
+  <div class="picker-card" style="max-width:400px;">
+    <h1 style="font-size:1.15rem;margin-bottom:10px;">Reveal test accuracy?</h1>
+    <p style="margin-bottom:8px;">You're about to reveal the test score for <strong id="reveal-model-name"></strong>.</p>
+    <p style="margin-bottom:24px;font-size:0.9rem;color:#6b7280;">This is <strong>irreversible</strong> — you won't be able to retune this model afterward. Make sure you're satisfied with its validation score first.</p>
+    <div style="display:flex;gap:12px;justify-content:center;">
+      <button onclick="confirmReveal()" style="padding:10px 24px;background:#6366f1;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;">Reveal</button>
+      <button onclick="cancelReveal()" style="padding:10px 24px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main app ── -->
+<div id="app" style="display:none;">
+  <header>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <h1>Split or Regret</h1>
+      <span class="level-badge">Level 3</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button id="hint-btn" onclick="showHint()" style="display:none;font-size:0.78rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--radius);padding:4px 10px;cursor:pointer;line-height:1.4;font-family:var(--font);">💡 hint</button>
+      <div style="position:relative;">
+        <button id="menu-btn" onclick="toggleMenu()">&#9776;</button>
+        <div id="menu-dropdown">
+          <button class="menu-item" onclick="menuAction('theme')">⚙ Theme</button>
+          <button class="menu-item" id="menu-models" onclick="menuAction('models')" style="display:none;">⚙ Model Names</button>
+          <hr class="menu-divider">
+          <button class="menu-item danger" onclick="menuAction('reset')">↺ Reset Level</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Guide banner -->
+    <div id="guide-banner" onclick="this.style.display='none';document.getElementById('hint-btn').style.display='';">
+      <span id="guide-emoji" style="font-size:1.2rem;line-height:1;flex-shrink:0;">🎯</span>
+      <span id="guide-text" style="font-size:0.9rem;line-height:1.5;color:var(--text);flex:1;"></span>
+      <span style="font-size:0.75rem;color:var(--muted);white-space:nowrap;padding-top:2px;flex-shrink:0;">tap to dismiss</span>
+    </div>
+
+    <!-- Three-way split visualization -->
+    <div class="split-container">
+      <div class="split-zones">
+        <span class="zone-lbl lbl-train">Train <span class="split-ct" id="train-ct"></span></span>
+        <div id="class-legend">
+          <span style="display:flex;align-items:center;gap:4px;">
+            <svg width="9" height="9" viewBox="0 0 10 10" style="color:var(--block-selected);flex-shrink:0;"><rect fill="currentColor" width="10" height="10"/></svg>
+            A: <span id="legend-a-count">—</span>
+          </span>
+          <span style="display:flex;align-items:center;gap:4px;">
+            <svg width="9" height="9" viewBox="0 0 10 10" style="color:var(--block-selected);flex-shrink:0;"><rect fill="currentColor" width="10" height="10"/><circle fill="var(--surface)" cx="5" cy="5" r="2.8"/></svg>
+            B: <span id="legend-b-count">—</span>
+          </span>
+        </div>
+        <span class="zone-lbl lbl-val">Val <span class="split-ct" id="val-ct"></span></span>
+        <span class="zone-lbl lbl-test">
+          <svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor" style="flex-shrink:0;">
+            <rect x="1" y="5" width="8" height="7" rx="1"/>
+            <path d="M3 5V3.5a2 2 0 0 1 4 0V5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+          Test <span class="split-ct" id="test-ct"></span>
+        </span>
+      </div>
+      <div class="split-bar-track">
+        <div class="split-bar-seg" id="bar-train"></div>
+        <div class="split-bar-seg" id="bar-val"></div>
+        <div class="split-bar-seg" id="bar-test"></div>
+      </div>
+      <input type="range" id="split-slider" min="24" max="90" value="72" step="1">
+      <div id="data-grid"></div>
+      <div class="split-hint" id="split-hint">
+        Drag to adjust the train / validation split — test is always held out
+        <button class="info-btn" onclick="showTooltip(this,event)" data-tip="split">i</button>
+      </div>
+    </div>
+
+    <!-- Model selection -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:16px;">
+      <div class="section-label">Choose a model</div>
+      <div class="model-row" id="model-buttons"></div>
+    </div>
+
+    <!-- Hyperparameter panel -->
+    <div id="hp-panel" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:16px;">
+      <div class="section-label" id="hp-panel-label">Hyperparameters</div>
+      <div id="hp-sliders"></div>
+      <div id="hp-locked-msg" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:0.82rem;color:var(--muted);">
+        🔒 Configuration locked in — test score revealed. Select another model to keep exploring.
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div id="controls">
+      <button class="btn btn-train" id="train-btn" onclick="doTrain()">▶ Train</button>
+      <button class="info-btn" onclick="showTooltip(this,event)" data-tip="train">i</button>
+    </div>
+
+    <!-- Training progress -->
+    <div id="progress-panel" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-top:12px;">
+      <div class="section-label" id="prog-label">Training…</div>
+      <div class="prog-bg"><div id="prog-fill"></div></div>
+      <div id="prog-text" style="margin-top:6px;font-size:0.82rem;color:var(--muted);"></div>
+    </div>
+
+    <!-- Accuracy panel -->
+    <div id="accuracy-panel" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-top:12px;">
+      <div class="section-label" style="margin-bottom:2px;">Performance — <span id="acc-model-label" style="text-transform:none;font-weight:700;color:var(--text);"></span></div>
+      <div class="accuracy-row">
+        <div class="accuracy-label" style="display:flex;align-items:center;gap:5px;">
+          Train accuracy
+          <button class="info-btn" onclick="showTooltip(this,event)" data-tip="train-acc">i</button>
+        </div>
+        <div class="accuracy-bar-bg"><div class="accuracy-bar" id="train-bar" style="width:0%"></div></div>
+        <div class="accuracy-pct" id="train-pct">—</div>
+      </div>
+      <div class="accuracy-row" style="margin-top:6px;">
+        <div class="accuracy-label" style="display:flex;align-items:center;gap:5px;color:var(--val);">
+          Val accuracy
+          <button class="info-btn" onclick="showTooltip(this,event)" data-tip="val-acc">i</button>
+        </div>
+        <div class="accuracy-bar-bg"><div class="accuracy-bar val-bar-fill" id="val-bar" style="width:0%"></div></div>
+        <div class="accuracy-pct" id="val-pct" style="color:var(--val);">—</div>
+      </div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div id="leaderboard-panel" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-top:16px;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;">
+        <div class="section-label" style="margin-bottom:0;">Leaderboard</div>
+        <span id="lb-hint" style="font-size:0.78rem;color:var(--muted);"></span>
+      </div>
+      <!-- Column headers -->
+      <div style="display:grid;grid-template-columns:26px minmax(60px,1fr) auto 48px auto;gap:8px;padding:0 12px 6px;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">
+        <div></div>
+        <div>Model</div>
+        <div>HPs</div>
+        <div style="text-align:right;">Val</div>
+        <div style="text-align:right;min-width:80px;">Test</div>
+      </div>
+      <div id="leaderboard"></div>
+    </div>
+
+    <!-- Deploy section (stage 3) -->
+    <div id="deploy-section" style="display:none;"></div>
+  </main>
+</div>
+
+<div id="tooltip"></div>
+
 <script src="js/state.js"></script>
+<script src="js/log.js"></script>
 <script src="js/themes.js"></script>
-<script>Themes.fromState();</script>
+<script>
+// ── Model & HP config ─────────────────────────────────────────────────────────
+const MODEL_NAMES = {
+  greek:     ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta'],
+  animals:   ['Fox', 'Wolf', 'Bear', 'Eagle', 'Shark', 'Tiger'],
+  zodiac:    ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo'],
+  realistic: ['SVM', 'Random Forest', 'Gradient Boosting', 'Neural Net', 'KNN', 'Naive Bayes'],
+};
+
+const HP_CONFIG = [
+  { greek:    { hp1:'Magnitude',          hp2:'Convergence'      },
+    animals:  { hp1:'Cunning',            hp2:'Agility'          },
+    zodiac:   { hp1:'Intensity',          hp2:'Impulsiveness'    },
+    realistic:{ hp1:'Regularization (C)', hp2:'Kernel Width (γ)' } },
+  { greek:    { hp1:'Sensitivity',        hp2:'Threshold'        },
+    animals:  { hp1:'Pack Size',          hp2:'Aggression'       },
+    zodiac:   { hp1:'Stubbornness',       hp2:'Patience'         },
+    realistic:{ hp1:'Trees',              hp2:'Max Depth'        } },
+  { greek:    { hp1:'Curvature',          hp2:'Decay'            },
+    animals:  { hp1:'Hibernation',        hp2:'Foraging Range'   },
+    zodiac:   { hp1:'Adaptability',       hp2:'Inconsistency'    },
+    realistic:{ hp1:'Learning Rate',      hp2:'Estimators'       } },
+  { greek:    { hp1:'Step Size',          hp2:'Momentum'         },
+    animals:  { hp1:'Wingspan',           hp2:'Dive Speed'       },
+    zodiac:   { hp1:'Intuition',          hp2:'Sensitivity'      },
+    realistic:{ hp1:'Learning Rate',      hp2:'Hidden Layers'    } },
+  { greek:    { hp1:'Tolerance',          hp2:null },
+    animals:  { hp1:'Bite Force',         hp2:null },
+    zodiac:   { hp1:'Confidence',         hp2:null },
+    realistic:{ hp1:'K (Neighbors)',      hp2:null } },
+  { greek:    { hp1:'Amplitude',          hp2:null },
+    animals:  { hp1:'Ferocity',           hp2:null },
+    zodiac:   { hp1:'Precision',          hp2:null },
+    realistic:{ hp1:'Smoothing (α)',      hp2:null } },
+];
+
+// ── Accuracy curves (one per model position) ──────────────────────────────────
+// base: train accuracy with hp1=0 and average training data
+// hp1TrainBoost: how much HP1=100 adds to train accuracy
+// hp1sweet: HP1 value (0-100) where overfitting starts kicking in
+// hp1OverfitMax: max validation penalty at HP1=100 (quadratic)
+// hp2sweet: optimal HP2 value (0-100); omit for 1-param models
+// hp2PenaltyMax: max validation penalty when HP2 is fully wrong
+// jitter: run-to-run noise amplitude
+const CURVES = [
+  // Pos 0 (SVM/Alpha): moderate tolerance, tight HP2 sweet spot
+  { base:0.57, hp1TrainBoost:0.34, hp1sweet:58, hp1OverfitMax:0.38, hp2sweet:42, hp2PenaltyMax:0.22, jitter:0.028 },
+  // Pos 1 (RandForest/Beta): very tolerant of high HP1, wide HP2 range
+  { base:0.53, hp1TrainBoost:0.38, hp1sweet:74, hp1OverfitMax:0.20, hp2sweet:58, hp2PenaltyMax:0.15, jitter:0.035 },
+  // Pos 2 (GradBoost/Gamma): overfits fast with high HP1
+  { base:0.50, hp1TrainBoost:0.42, hp1sweet:32, hp1OverfitMax:0.48, hp2sweet:62, hp2PenaltyMax:0.26, jitter:0.040 },
+  // Pos 3 (NeuralNet/Delta): moderate sensitivity, symmetric HP2 sweet spot
+  { base:0.54, hp1TrainBoost:0.32, hp1sweet:50, hp1OverfitMax:0.35, hp2sweet:50, hp2PenaltyMax:0.20, jitter:0.045 },
+  // Pos 4 (KNN/Epsilon): 1 param, sweet spot at mid-low
+  { base:0.52, hp1TrainBoost:0.38, hp1sweet:40, hp1OverfitMax:0.42, jitter:0.030 },
+  // Pos 5 (NaiveBayes/Zeta): 1 param, high base, gentle curve
+  { base:0.63, hp1TrainBoost:0.22, hp1sweet:55, hp1OverfitMax:0.28, jitter:0.020 },
+];
+
+// ── Tooltips ──────────────────────────────────────────────────────────────────
+const TIPS = {
+  'split':       'The validation set lets you compare models and tune settings without ever touching the test set. Once you\'re satisfied with a model, reveal its test score — once, irreversibly.',
+  'split-locked':'The split is fixed once training starts so all model comparisons stay on equal footing.',
+  'train':       'The model looks at the training portion and learns to recognise patterns.',
+  'train-acc':   'How often the model correctly predicted the label on the data it was trained on.',
+  'val-acc':     'How often the model predicted correctly on the validation set. Because it never trained on these examples, this is an honest estimate — and you can check it as many times as you like.',
+  'test-lock':   'Revealing test accuracy is irreversible for that model. Use it to confirm your best choice, not to keep searching.',
+  'test-acc':    'The held-out test score. Only available once per model. Use it to confirm, not to search for more improvements.',
+  'deploy':      'Ship the model. Real-world accuracy should closely match the test score you already revealed.',
+};
+
+function showTooltip(btn, e) {
+  e.stopPropagation();
+  const tip = document.getElementById('tooltip');
+  if (tip.style.display === 'block' && tip.dataset.src === btn.dataset.tip) {
+    tip.style.display = 'none'; return;
+  }
+  tip.textContent = TIPS[btn.dataset.tip] || '';
+  tip.dataset.src = btn.dataset.tip;
+  tip.style.display = 'block';
+  const r  = btn.getBoundingClientRect();
+  const tw = Math.min(260, window.innerWidth - 20);
+  tip.style.maxWidth = tw + 'px';
+  let left = Math.min(r.left, window.innerWidth - tw - 10);
+  let top  = r.bottom + 6;
+  if (top + 80 > window.innerHeight) top = r.top - tip.offsetHeight - 6;
+  tip.style.left = Math.max(10, left) + 'px';
+  tip.style.top  = top + 'px';
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const TOTAL      = 120;
+const TEST_SIZE  = 24;
+const TEST_START = TOTAL - TEST_SIZE;  // 96
+
+const SVG_A = `<svg viewBox="0 0 10 10"><rect class="block-fill" width="10" height="10"/></svg>`;
+const SVG_B = `<svg viewBox="0 0 10 10"><rect class="block-fill" width="10" height="10"/><circle class="block-hole" cx="5" cy="5" r="2.8"/></svg>`;
+
+// ── Session state ─────────────────────────────────────────────────────────────
+let blockClasses = [];
+let trainPt      = 72;
+let splitLocked  = false;
+let selModel     = 0;
+let busy         = false;
+let pendingRevealIdx = -1;
+let _pulseEl     = null;
+
+// Per-model state
+const mSt = Array.from({length: 6}, () => ({
+  hp1: 50, hp2: 50,
+  trained: false, lockedIn: false,
+  trainAcc: null, valAcc: null, testAcc: null,
+  lockedHp1: null, lockedHp2: null,
+}));
+
+function initBlockClasses() {
+  blockClasses = Array.from({length: TOTAL}, () => Math.random() < 0.5 ? 'A' : 'B');
+}
+initBlockClasses();
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function getModelSet() { return State.get('modelSet') || 'greek'; }
+function getLabels()   { return MODEL_NAMES[getModelSet()]; }
+function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+function fmtPct(v) { return Math.round(v * 100) + '%'; }
+function hasHp2(idx) { return HP_CONFIG[idx][getModelSet()].hp2 !== null; }
+
+function showHoverTip(text, x, y) {
+  const tip = document.getElementById('tooltip');
+  tip.textContent = text; tip.dataset.src = '';
+  tip.style.maxWidth = '220px'; tip.style.display = 'block';
+  tip.style.left = Math.max(10, Math.min(x + 14, window.innerWidth - 230)) + 'px';
+  tip.style.top  = (y + 18) + 'px';
+}
+function hideHoverTip() { document.getElementById('tooltip').style.display = 'none'; }
+
+// ── Accuracy computation ──────────────────────────────────────────────────────
+function computeAccuracy(modelIdx, hp1, hp2) {
+  const c        = CURVES[modelIdx];
+  const trainRatio = trainPt / TOTAL;
+  const hp1n     = hp1 / 100;
+
+  // Train accuracy: grows with HP1 and with more training data
+  const rawTrain = c.base + trainRatio * 0.13 + hp1n * c.hp1TrainBoost;
+  const trainAcc = clamp(rawTrain + c.jitter * (Math.random() - 0.5), 0.40, 0.97);
+
+  // Overfitting: quadratic penalty when HP1 exceeds sweet spot
+  const sp      = c.hp1sweet / 100;
+  const excess  = Math.max(0, (hp1n - sp) / (1 - sp + 0.001));
+  const overP   = excess * excess * c.hp1OverfitMax;
+
+  // HP2 distance penalty (2-param models only)
+  let hp2P = 0;
+  if (hp2 !== null && c.hp2sweet !== undefined) {
+    const dist = Math.abs(hp2 / 100 - c.hp2sweet / 100) / 0.5;
+    hp2P = Math.min(1, dist) * c.hp2PenaltyMax;
+  }
+
+  const baseGap = 0.07 + (1 - trainRatio) * 0.03;
+  const valAcc  = clamp(
+    trainAcc - baseGap - overP - hp2P + c.jitter * (Math.random() - 0.5),
+    0.33, trainAcc
+  );
+  return { trainAcc, valAcc };
+}
+
+function computeTestAcc(valAcc) {
+  // Test closely mirrors val — the whole point is that test hasn't been peeked at
+  return clamp(valAcc + (Math.random() - 0.5) * 0.04, 0.33, 0.97);
+}
+
+// ── Grid ──────────────────────────────────────────────────────────────────────
+function renderGrid() {
+  const g = document.getElementById('data-grid');
+  g.innerHTML = '';
+  for (let i = 0; i < TOTAL; i++) {
+    const zone = i < trainPt ? 'train' : i < TEST_START ? 'val' : 'test';
+    const b = document.createElement('div');
+    b.className = 'block ' + zone;
+    b.innerHTML = blockClasses[i] === 'A' ? SVG_A : SVG_B;
+    b.addEventListener('mouseenter', e => {
+      const label = zone === 'train' ? 'Train' : zone === 'val' ? 'Validation' : 'Test (held out)';
+      showHoverTip(`${label} · ID ${i}: Class ${blockClasses[i]}`, e.clientX, e.clientY);
+    });
+    b.addEventListener('mouseleave', hideHoverTip);
+    g.appendChild(b);
+  }
+}
+
+// ── Split UI ──────────────────────────────────────────────────────────────────
+function updateSplitUI() {
+  const valPt = TEST_START - trainPt;
+  document.getElementById('train-ct').textContent = '(' + trainPt   + ')';
+  document.getElementById('val-ct').textContent   = '(' + valPt     + ')';
+  document.getElementById('test-ct').textContent  = '(' + TEST_SIZE + ')';
+  document.getElementById('bar-train').style.flex = String(trainPt);
+  document.getElementById('bar-val').style.flex   = String(valPt);
+  document.getElementById('bar-test').style.flex  = String(TEST_SIZE);
+  const countA = blockClasses.filter(c => c === 'A').length;
+  document.getElementById('legend-a-count').textContent = countA;
+  document.getElementById('legend-b-count').textContent = TOTAL - countA;
+}
+
+function lockSplit() {
+  splitLocked = true;
+  const slider = document.getElementById('split-slider');
+  slider.disabled = true; slider.style.opacity = '0.4';
+  document.getElementById('split-hint').innerHTML =
+    '🔒 Split locked <button class="info-btn" onclick="showTooltip(this,event)" data-tip="split-locked" style="margin-left:2px;">i</button>';
+}
+
+// ── Model buttons ─────────────────────────────────────────────────────────────
+function renderModelBtns() {
+  const labels = getLabels();
+  const c = document.getElementById('model-buttons');
+  c.innerHTML = '';
+  labels.forEach((lbl, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'model-btn' + (i === selModel ? ' active' : '') + (mSt[i].trained ? ' tried' : '');
+    btn.onclick   = () => selectModel(i);
+    if (mSt[i].lockedIn) {
+      btn.innerHTML = lbl + ' <span style="font-size:0.65rem;opacity:0.6;">🔒</span>';
+    } else {
+      btn.textContent = lbl;
+    }
+    c.appendChild(btn);
+  });
+}
+
+function selectModel(i) {
+  selModel = i;
+  renderModelBtns();
+  renderHpPanel();
+  const ms = mSt[i];
+  if (ms.trained) {
+    showAccuracyFor(i);
+  } else {
+    document.getElementById('accuracy-panel').style.display = 'none';
+  }
+}
+
+// ── HP panel ──────────────────────────────────────────────────────────────────
+function renderHpPanel() {
+  const ms      = mSt[selModel];
+  const set     = getModelSet();
+  const cfg     = HP_CONFIG[selModel][set];
+  const locked  = ms.lockedIn;
+  const label   = getLabels()[selModel];
+
+  document.getElementById('hp-panel-label').textContent = label + ' — Hyperparameters';
+  document.getElementById('hp-locked-msg').style.display = locked ? 'block' : 'none';
+  document.getElementById('train-btn').disabled = locked || busy;
+
+  const container = document.getElementById('hp-sliders');
+  container.innerHTML = '';
+
+  const hp1val = locked ? ms.lockedHp1 : ms.hp1;
+  container.appendChild(makeHpRow('hp1', cfg.hp1, hp1val, locked));
+
+  if (cfg.hp2 !== null) {
+    const hp2val = locked ? ms.lockedHp2 : ms.hp2;
+    container.appendChild(makeHpRow('hp2', cfg.hp2, hp2val, locked));
+  }
+}
+
+function makeHpRow(key, name, value, locked) {
+  const row = document.createElement('div');
+  row.className = 'hp-slider-row';
+
+  const lbl = document.createElement('span');
+  lbl.className = 'hp-name'; lbl.textContent = name;
+  row.appendChild(lbl);
+
+  const slider = document.createElement('input');
+  slider.type = 'range'; slider.min = 1; slider.max = 100;
+  slider.value = value; slider.className = 'hp-slider'; slider.disabled = locked;
+
+  const valDisplay = document.createElement('span');
+  valDisplay.className = 'hp-val'; valDisplay.textContent = value;
+
+  slider.addEventListener('input', function() {
+    mSt[selModel][key] = +this.value;
+    valDisplay.textContent = this.value;
+  });
+
+  row.appendChild(slider);
+  row.appendChild(valDisplay);
+  return row;
+}
+
+// ── Training ──────────────────────────────────────────────────────────────────
+function doTrain() {
+  if (busy || mSt[selModel].lockedIn) return;
+  busy = true;
+  clearPulse();
+  document.getElementById('train-btn').disabled = true;
+
+  const ms       = mSt[selModel];
+  const hp2arg   = hasHp2(selModel) ? ms.hp2 : null;
+  const duration = Math.max(800, (trainPt / TOTAL) * 4500);
+
+  const sweep = document.createElement('div');
+  sweep.className = 'train-sweep';
+  sweep.style.animationDuration = duration + 'ms';
+  document.getElementById('data-grid').appendChild(sweep);
+  sweep.addEventListener('animationend', () => sweep.remove(), { once: true });
+
+  showProg('Training…');
+  runProg(duration, trainPt, 'Training on example', () => {
+    const { trainAcc, valAcc } = computeAccuracy(selModel, ms.hp1, hp2arg);
+    ms.trainAcc = trainAcc;
+    ms.valAcc   = valAcc;
+    ms.trained  = true;
+
+    hideProg();
+    renderModelBtns();
+    showAccuracyFor(selModel);
+
+    if (!splitLocked) lockSplit();
+    renderLeaderboard();
+
+    const lbPanel = document.getElementById('leaderboard-panel');
+    if (lbPanel.style.display === 'none') {
+      lbPanel.style.display = 'block';
+      setTimeout(() => lbPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+    }
+
+    busy = false;
+    document.getElementById('train-btn').disabled = mSt[selModel].lockedIn;
+    updateBanner();
+
+    Log.event('l3_train', {
+      model: selModel, modelName: getLabels()[selModel],
+      hp1: ms.hp1, hp2: hp2arg,
+      trainAcc, valAcc,
+      splitTrain: trainPt, splitVal: TEST_START - trainPt, splitTest: TEST_SIZE,
+    });
+  });
+}
+
+// ── Accuracy panel ────────────────────────────────────────────────────────────
+function showAccuracyFor(idx) {
+  const ms = mSt[idx];
+  const panel = document.getElementById('accuracy-panel');
+  panel.style.display = 'block';
+  document.getElementById('acc-model-label').textContent = getLabels()[idx];
+  requestAnimationFrame(() => {
+    setBar('train-bar', 'train-pct', ms.trainAcc);
+    setBar('val-bar', 'val-pct', ms.valAcc);
+  });
+}
+
+function setBar(barId, pctId, val) {
+  document.getElementById(barId).style.width = fmtPct(val);
+  document.getElementById(pctId).textContent = fmtPct(val);
+}
+
+// ── Leaderboard ───────────────────────────────────────────────────────────────
+function renderLeaderboard() {
+  const labels   = getLabels();
+  const set      = getModelSet();
+  const container = document.getElementById('leaderboard');
+  container.innerHTML = '';
+
+  // Sort: trained by val desc, then untrained
+  const order = Array.from({length: 6}, (_, i) => i).sort((a, b) => {
+    if (!mSt[a].trained && !mSt[b].trained) return a - b;
+    if (!mSt[a].trained) return 1;
+    if (!mSt[b].trained) return -1;
+    return mSt[b].valAcc - mSt[a].valAcc;
+  });
+
+  const lockedCount = mSt.filter(m => m.lockedIn).length;
+  const need = Math.max(0, 3 - lockedCount);
+  document.getElementById('lb-hint').textContent =
+    lockedCount >= 3 ? '' : `Lock in ${need} more model${need !== 1 ? 's' : ''} to unlock deploy`;
+
+  let rank = 1;
+  order.forEach(i => {
+    const ms  = mSt[i];
+    const cfg = HP_CONFIG[i][set];
+    const row = document.createElement('div');
+    row.className = 'lb-row' + (!ms.trained ? ' untrained' : ms.lockedIn ? ' is-locked' : '');
+
+    // Rank
+    const rankEl = document.createElement('div');
+    rankEl.className = 'lb-rank';
+    rankEl.textContent = ms.trained ? '#' + rank++ : '—';
+    row.appendChild(rankEl);
+
+    // Model name
+    const nameEl = document.createElement('div');
+    nameEl.className = 'lb-name'; nameEl.textContent = labels[i];
+    row.appendChild(nameEl);
+
+    // HP values (compact)
+    const hpEl = document.createElement('div');
+    hpEl.className = 'lb-hps';
+    if (ms.trained) {
+      const h1 = ms.lockedIn ? ms.lockedHp1 : ms.hp1;
+      const h2 = ms.lockedIn ? ms.lockedHp2 : (hasHp2(i) ? ms.hp2 : null);
+      hpEl.textContent = cfg.hp1 + ': ' + h1 + (h2 !== null ? ' · ' + cfg.hp2 + ': ' + h2 : '');
+    } else {
+      hpEl.textContent = '—';
+    }
+    row.appendChild(hpEl);
+
+    // Val accuracy
+    const valEl = document.createElement('div');
+    valEl.className = 'lb-val';
+    valEl.textContent = ms.trained ? fmtPct(ms.valAcc) : '—';
+    row.appendChild(valEl);
+
+    // Test accuracy or reveal button or dash
+    const testEl = document.createElement('div');
+    testEl.className = 'lb-test';
+    if (!ms.trained) {
+      const dash = document.createElement('span');
+      dash.className = 'lb-dash'; dash.textContent = '—';
+      testEl.appendChild(dash);
+    } else if (ms.lockedIn) {
+      const gap   = ms.testAcc - ms.valAcc;
+      const cls   = Math.abs(gap) <= 0.04 ? 'good' : gap < -0.04 ? 'bad' : 'ok';
+      const score = document.createElement('span');
+      score.className = 'test-score ' + cls;
+      score.textContent = fmtPct(ms.testAcc);
+      testEl.appendChild(score);
+    } else {
+      const btn = document.createElement('button');
+      btn.className = 'reveal-btn';
+      btn.innerHTML = '🔒 Reveal';
+      btn.onclick = () => startReveal(i);
+      testEl.appendChild(btn);
+    }
+    row.appendChild(testEl);
+
+    container.appendChild(row);
+  });
+
+  // Show deploy once 3 models are locked
+  if (lockedCount >= 3 && document.getElementById('deploy-section').style.display === 'none') {
+    showDeploySection();
+  }
+}
+
+// ── Reveal test ───────────────────────────────────────────────────────────────
+function startReveal(idx) {
+  pendingRevealIdx = idx;
+  document.getElementById('reveal-model-name').textContent = getLabels()[idx];
+  document.getElementById('reveal-overlay').style.display = 'flex';
+}
+
+function confirmReveal() {
+  document.getElementById('reveal-overlay').style.display = 'none';
+  if (pendingRevealIdx < 0) return;
+  const idx = pendingRevealIdx;
+  const ms  = mSt[idx];
+  ms.testAcc   = computeTestAcc(ms.valAcc);
+  ms.lockedIn  = true;
+  ms.lockedHp1 = ms.hp1;
+  ms.lockedHp2 = hasHp2(idx) ? ms.hp2 : null;
+  pendingRevealIdx = -1;
+
+  Log.event('l3_reveal_test', {
+    model: idx, modelName: getLabels()[idx],
+    hp1: ms.lockedHp1, hp2: ms.lockedHp2,
+    valAcc: ms.valAcc, testAcc: ms.testAcc,
+  });
+
+  renderModelBtns();
+  renderLeaderboard();
+  // If currently viewing this model, refresh HP panel
+  if (selModel === idx) renderHpPanel();
+  updateBanner();
+}
+
+function cancelReveal() {
+  document.getElementById('reveal-overlay').style.display = 'none';
+  pendingRevealIdx = -1;
+}
+
+// ── Deploy section placeholder (stage 3 will fill this) ───────────────────────
+function showDeploySection() {
+  const el = document.getElementById('deploy-section');
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-top:16px;">
+      <div class="section-label" style="margin-bottom:8px;">🚀 Deploy a model</div>
+      <p style="font-size:0.88rem;color:var(--muted);">Deploy coming in the next stage.</p>
+    </div>`;
+  setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+  updateBanner();
+}
+
+// ── Progress bar ──────────────────────────────────────────────────────────────
+function showProg(label) {
+  document.getElementById('prog-label').textContent = label;
+  document.getElementById('prog-fill').style.width  = '0%';
+  document.getElementById('prog-text').textContent  = '';
+  document.getElementById('progress-panel').style.display = 'block';
+}
+function hideProg() { document.getElementById('progress-panel').style.display = 'none'; }
+function runProg(duration, total, verb, onDone) {
+  const t0 = performance.now(); let lastStep = -1;
+  (function frame(now) {
+    const p = Math.min((now - t0) / duration, 1);
+    const e = 1 - Math.pow(1 - p, 2);
+    const step = Math.round(e * total);
+    document.getElementById('prog-fill').style.width = (e * 100).toFixed(1) + '%';
+    if (step !== lastStep) {
+      document.getElementById('prog-text').textContent = verb + ' ' + step + '/' + total;
+      lastStep = step;
+    }
+    if (p < 1) requestAnimationFrame(frame);
+    else setTimeout(onDone, 150);
+  })(performance.now());
+}
+
+// ── Guide banner ──────────────────────────────────────────────────────────────
+function updateBanner() {
+  const anyTrained   = mSt.some(m => m.trained);
+  const lockedCount  = mSt.filter(m => m.lockedIn).length;
+  const trainedCount = mSt.filter(m => m.trained).length;
+  const deployReady  = document.getElementById('deploy-section').style.display !== 'none';
+
+  let emoji, html;
+  if (deployReady && lockedCount >= 3) {
+    emoji = '🚀';
+    html  = `<strong>You've unlocked deploy.</strong> Look at the leaderboard to compare your models, then scroll down to choose one and ship it.`;
+  } else if (lockedCount >= 1) {
+    const need = Math.max(0, 3 - lockedCount);
+    emoji = '🔒';
+    html  = `<strong>${lockedCount} model${lockedCount > 1 ? 's' : ''} locked in.</strong> ${need > 0 ? 'Explore ' + need + ' more and lock them in to unlock deploy.' : 'You can deploy now.'}`;
+  } else if (anyTrained) {
+    emoji = '🔬';
+    html  = `<strong>Good start.</strong> Try different models or adjust the hyperparameters and retrain. When you like a model's validation score, click <strong>🔒 Reveal</strong> in the leaderboard to commit.`;
+  } else {
+    emoji = '🎯';
+    html  = `<strong>Your data has three splits.</strong> Choose a model, adjust its hyperparameters, and click <strong>Train</strong> to start exploring.`;
+  }
+
+  document.getElementById('guide-emoji').textContent = emoji;
+  document.getElementById('guide-text').innerHTML    = html;
+  document.getElementById('guide-banner').style.display = 'flex';
+  document.getElementById('hint-btn').style.display = 'none';
+}
+
+// ── Pulse ring ────────────────────────────────────────────────────────────────
+function setPulse(id) {
+  if (_pulseEl) { _pulseEl.classList.remove('next-pulse'); _pulseEl = null; }
+  if (id) { _pulseEl = document.getElementById(id); if (_pulseEl) _pulseEl.classList.add('next-pulse'); }
+}
+function clearPulse() { setPulse(null); }
+
+// ── Hint button ───────────────────────────────────────────────────────────────
+function showHint() {
+  document.getElementById('guide-banner').style.display = 'flex';
+  document.getElementById('hint-btn').style.display = 'none';
+  setTimeout(() => document.getElementById('guide-banner').scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+}
+
+// ── Hamburger menu ────────────────────────────────────────────────────────────
+function toggleMenu() { document.getElementById('menu-dropdown').classList.toggle('open'); }
+function menuAction(action) {
+  document.getElementById('menu-dropdown').classList.remove('open');
+  if (action === 'theme')  document.getElementById('theme-overlay').style.display = 'flex';
+  if (action === 'models') document.getElementById('model-overlay').style.display  = 'flex';
+  if (action === 'reset')  document.getElementById('reset-overlay').style.display  = 'flex';
+}
+
+// ── Theme / model set ─────────────────────────────────────────────────────────
+function pickTheme(name) {
+  State.set('theme', name); Themes.apply(name);
+  document.getElementById('theme-overlay').style.display = 'none';
+}
+function pickModelSet(name) {
+  State.set('modelSet', name);
+  document.getElementById('menu-models').style.display = '';
+  document.getElementById('model-overlay').style.display = 'none';
+  renderModelBtns();
+  renderHpPanel();
+  if (document.getElementById('leaderboard-panel').style.display !== 'none') renderLeaderboard();
+}
+
+// ── Interstitial ──────────────────────────────────────────────────────────────
+function dismissInterstitial() {
+  document.getElementById('interstitial').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  State.setLevel(3, { started: true });
+  Log.event('l3_start', { theme: State.get('theme'), modelSet: getModelSet() });
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+function doReset() {
+  document.getElementById('reset-overlay').style.display = 'none';
+  splitLocked = false; selModel = 0; busy = false; pendingRevealIdx = -1;
+  trainPt = 72;
+  mSt.forEach(m => Object.assign(m, {
+    hp1:50, hp2:50, trained:false, lockedIn:false,
+    trainAcc:null, valAcc:null, testAcc:null, lockedHp1:null, lockedHp2:null,
+  }));
+  initBlockClasses();
+
+  const slider = document.getElementById('split-slider');
+  slider.value = 72; slider.disabled = false; slider.style.opacity = '';
+  document.getElementById('split-hint').innerHTML =
+    'Drag to adjust the train / validation split — test is always held out ' +
+    '<button class="info-btn" onclick="showTooltip(this,event)" data-tip="split">i</button>';
+
+  renderGrid();
+  updateSplitUI();
+  renderModelBtns();
+  renderHpPanel();
+
+  document.getElementById('accuracy-panel').style.display    = 'none';
+  document.getElementById('leaderboard-panel').style.display = 'none';
+  document.getElementById('deploy-section').style.display    = 'none';
+  document.getElementById('deploy-section').innerHTML        = '';
+  document.getElementById('progress-panel').style.display    = 'none';
+  document.getElementById('train-btn').disabled              = false;
+
+  clearPulse();
+  updateBanner();
+  State.setLevel(3, { started: true, completed: false });
+  Log.event('l3_reset', {});
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── Global event listeners ────────────────────────────────────────────────────
+document.getElementById('split-slider').addEventListener('input', function() {
+  if (splitLocked) return;
+  trainPt = +this.value;
+  renderGrid();
+  updateSplitUI();
+});
+
+document.addEventListener('click', () => {
+  document.getElementById('tooltip').style.display = 'none';
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#menu-btn') && !e.target.closest('#menu-dropdown')) {
+    document.getElementById('menu-dropdown').classList.remove('open');
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+Themes.fromState();
+if (State.get('modelSet')) document.getElementById('menu-models').style.display = '';
+
+if (State.getLevel(3).started) {
+  document.getElementById('interstitial').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+}
+
+renderGrid();
+updateSplitUI();
+renderModelBtns();
+renderHpPanel();
+updateBanner();
+setPulse('split-slider');
+</script>
 </body>
 </html>

@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Split or Regret — Level 1</title>
+<!-- Apply theme before paint to prevent flash -->
+<script>
+  try {
+    const s = JSON.parse(localStorage.getItem('sor_state') || '{}');
+    document.documentElement.className = 'theme-' + (s.theme || 'clean');
+  } catch(e) {}
+</script>
+<link rel="stylesheet" href="css/shared.css">
+<style>
+.deploy-dot { aspect-ratio:1; border-radius:50%; background:var(--border); transition:background 0.15s; }
+.deploy-dot.correct { background:var(--train); }
+.deploy-dot.wrong   { background:var(--test); }
+.deploy-stream { display:grid; grid-template-columns:repeat(15,1fr); gap:3px; margin:14px 0; }
+@media (max-width:480px) { .deploy-stream { grid-template-columns:repeat(10,1fr); } }
+</style>
+</head>
+<body>
+
+<!-- Theme picker overlay -->
+<div id="theme-overlay" class="overlay" style="display:none;">
+  <div class="picker-card">
+    <h1>Change Theme</h1>
+    <p>Pick a different vibe</p>
+    <div class="picker-options">
+      <button class="picker-btn" onclick="changeTheme('clean')">
+        <div class="swatch swatch-clean"></div>Clean
+      </button>
+      <button class="picker-btn" onclick="changeTheme('dark')">
+        <div class="swatch swatch-dark"></div>Dark
+      </button>
+      <button class="picker-btn" onclick="changeTheme('retro')">
+        <div class="swatch swatch-retro"></div>Retro Terminal
+      </button>
+      <button class="picker-btn" onclick="changeTheme('candy')">
+        <div class="swatch swatch-candy"></div>Candy
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Model set picker overlay -->
+<div id="modelset-overlay" class="overlay" style="display:none;">
+  <div class="picker-card">
+    <h1 id="modelset-title">Choose Your Models</h1>
+    <p id="modelset-desc">Pick a naming style for the 6 models you'll train. You can change this anytime.</p>
+    <div class="picker-options">
+      <button class="picker-btn" onclick="pickModelSet('greek')">
+        <div style="font-size:1.3rem;letter-spacing:0.1em;margin-bottom:6px;">α β γ δ ε ζ</div>
+        Greek Letters
+      </button>
+      <button class="picker-btn" onclick="pickModelSet('animals')">
+        <div style="font-size:1.3rem;margin-bottom:6px;">🦊 🐺 🐻 🦅 🦈 🐯</div>
+        Animals
+      </button>
+      <button class="picker-btn" onclick="pickModelSet('zodiac')">
+        <div style="font-size:1.3rem;letter-spacing:0.05em;margin-bottom:6px;">♈ ♉ ♊ ♋ ♌ ♍</div>
+        Zodiac
+      </button>
+      <button class="picker-btn" onclick="pickModelSet('realistic')">
+        <div style="font-size:0.72rem;letter-spacing:0.04em;margin-bottom:8px;font-weight:700;color:#6b7280;">SVM · RandForest · GradBoost<br>NeuralNet · KNN · NaiveBayes</div>
+        Realistic
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app">
+  <header>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <h1>Split or Regret</h1>
+      <span class="level-badge">Level 1</span>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="header-btn" onclick="showThemePicker()">⚙ Theme</button>
+      <button id="models-btn" class="header-btn" onclick="showModelPicker()" style="display:none;">⚙ Models</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="guide-banner" style="background:var(--surface);border:1px solid var(--accent);border-radius:var(--radius);padding:14px 18px;margin-bottom:14px;display:flex;align-items:flex-start;gap:12px;">
+      <span style="font-size:1.2rem;line-height:1;">👆</span>
+      <span id="guide-text" style="font-size:0.9rem;line-height:1.5;color:var(--text);">
+        Each block is a training example — a sentence, an image, or a data point a model can learn from. Select a small handful, then click <strong>Train</strong>.
+      </span>
+    </div>
+
+    <div id="grid-container">
+      <div class="section-label">Data — click or drag to select blocks for training</div>
+      <div id="data-grid"></div>
+    </div>
+
+    <div id="controls">
+      <div id="model-panel" style="display:none;width:100%;margin-bottom:10px;">
+        <div class="section-label" style="margin-bottom:8px;">Model</div>
+        <div id="model-buttons" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;width:100%;">
+        <button class="btn btn-train" onclick="trainModel()">▶ Train</button>
+        <button class="btn btn-secondary" onclick="clearSelection()">Clear</button>
+        <span class="count-label" id="count-label">0 / 120 blocks selected</span>
+      </div>
+    </div>
+
+    <div id="training-progress" style="display:none;margin-top:20px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+        <div class="section-label" style="margin-bottom:10px;">Training…</div>
+        <div class="accuracy-bar-bg" style="height:16px;">
+          <div id="progress-bar" style="height:100%;background:var(--train);border-radius:6px;width:0%;transition:none;"></div>
+        </div>
+        <div id="progress-label" style="font-size:0.8rem;color:var(--muted);margin-top:8px;"></div>
+      </div>
+    </div>
+
+    <div id="accuracy-panel">
+      <div class="section-label">Results</div>
+      <div class="accuracy-row">
+        <span class="accuracy-label" id="accuracy-model-label">Train accuracy</span>
+        <div class="accuracy-bar-bg"><div class="accuracy-bar" id="train-bar" style="width:0%"></div></div>
+        <span class="accuracy-pct" id="train-pct">—</span>
+      </div>
+    </div>
+
+    <div id="history-panel" style="display:none;margin-top:20px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+        <div class="section-label" style="margin-bottom:12px;">Run History</div>
+        <div id="history-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+    </div>
+
+    <!-- Deploy section: appears after all 6 models tried -->
+    <div id="deploy-section" style="display:none;margin-top:24px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
+        <div class="section-label" style="margin-bottom:12px;">🚀 Deploy your model</div>
+        <p style="font-size:0.88rem;color:var(--muted);margin-bottom:14px;">
+          You've trained all 6 models. Now pick one to ship — and see how it performs on data it's never seen before.
+        </p>
+        <div id="deploy-model-row" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+        <button class="btn btn-train" id="deploy-btn" onclick="doL1Deploy()" style="margin-top:14px;">🚀 Deploy</button>
+        <div id="l1-stream" class="deploy-stream" style="display:none;"></div>
+        <div id="l1-results" style="display:none;margin-top:4px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;">
+              <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:6px;">Your training accuracy</div>
+              <div id="l1-cmp-train" style="font-size:1.8rem;font-weight:800;color:var(--train);">—</div>
+            </div>
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;">
+              <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:6px;">Real-world accuracy</div>
+              <div id="l1-cmp-real" style="font-size:1.8rem;font-weight:800;">—</div>
+            </div>
+          </div>
+          <div id="l1-reveal-msg" style="display:none;margin-top:14px;padding:14px 16px;border-radius:var(--radius);line-height:1.6;font-size:0.9rem;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Next stage: appears after deploy -->
+    <div id="next-stage-container" style="display:none;margin-top:16px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;text-align:center;">
+        <p style="color:var(--muted);font-size:0.9rem;line-height:1.6;max-width:520px;margin:0 auto 16px;">
+          <strong>Level 2 is a completely fresh start</strong> — a new dataset, a new problem, and a new set of models. Your task: learn to hold back a test set before training, so you have a reliable estimate before you deploy.
+        </p>
+        <button class="btn btn-next-stage" onclick="goNextStage()">Level 2: A New Dataset →</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/state.js"></script>
+<script src="js/log.js"></script>
+<script src="js/themes.js"></script>
+<script>
+  // ── Init ─────────────────────────────────────────────────────────────
+  Themes.fromState();
+  State.setLevel(1, { started: true });
+  Log.event('level_start', { level: 1 });
+
+  // ── Constants & session state ─────────────────────────────────────────
+  const TOTAL              = 120;
+  const FIRST_RUN_CAP      = 50;
+  const ACCURACY_THRESHOLD = 85; // % needed to unlock models
+
+  const MODEL_SETS = {
+    greek:     ['α','β','γ','δ','ε','ζ'],
+    animals:   ['🦊','🐺','🐻','🦅','🦈','🐯'],
+    zodiac:    ['♈','♉','♊','♋','♌','♍'],
+    realistic: ['SVM','RandForest','GradBoost','NeuralNet','KNN','NaiveBayes'],
+  };
+
+  // Per-model accuracy curves: acc = clamp(base + ratio*scale + jitter*(rand-0.5))
+  const MODEL_CURVES = [
+    { base: 0.52, scale: 0.40, jitter: 0.04 }, // 0: moderate, consistent
+    { base: 0.44, scale: 0.52, jitter: 0.04 }, // 1: needs data, high ceiling
+    { base: 0.63, scale: 0.26, jitter: 0.02 }, // 2: quick plateau
+    { base: 0.50, scale: 0.38, jitter: 0.12 }, // 3: high variance
+    { base: 0.40, scale: 0.57, jitter: 0.04 }, // 4: slow start, best ceiling
+    { base: 0.56, scale: 0.36, jitter: 0.03 }, // 5: reliable, high
+  ];
+
+  let currentModelSet = State.get('modelSet') || 'greek';
+  let selectedModel   = 0;
+  let modelsTried     = new Set();
+  let selected        = new Set();
+  let dragging        = false;
+  let dragMode        = null;
+  let onboardPhase    = 0; // 0=first-run cap, 1=nudge more data, 2=chase ACCURACY_THRESHOLD, 3=model explore
+  let phase2Tries     = 0; // how many times trained in phase 2 without hitting threshold
+  let training        = false;
+  let allRuns         = [];
+
+  // ── Grid ──────────────────────────────────────────────────────────────
+  const grid = document.getElementById('data-grid');
+  for (let i = 0; i < TOTAL; i++) {
+    const b = document.createElement('div');
+    b.className = 'block';
+    b.dataset.i = i;
+    grid.appendChild(b);
+  }
+
+  grid.addEventListener('dragstart', e => e.preventDefault());
+  grid.addEventListener('mousedown', e => {
+    const b = e.target.closest('.block');
+    if (!b) return;
+    e.preventDefault();
+    dragging = true;
+    dragMode = selected.has(+b.dataset.i) ? 'remove' : 'add';
+    applyToBlock(b);
+  });
+  grid.addEventListener('mouseover', e => {
+    if (!dragging) return;
+    const b = e.target.closest('.block');
+    if (b) applyToBlock(b);
+  });
+  document.addEventListener('mouseup', () => { dragging = false; dragMode = null; });
+
+  // Touch equivalents for drag-to-select
+  grid.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    const el = document.elementFromPoint(t.clientX, t.clientY)?.closest('.block');
+    if (!el) return;
+    dragging = true;
+    dragMode = selected.has(+el.dataset.i) ? 'remove' : 'add';
+    applyToBlock(el);
+  }, { passive: false });
+
+  grid.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    const el = document.elementFromPoint(t.clientX, t.clientY)?.closest('.block');
+    if (el) applyToBlock(el);
+  }, { passive: false });
+
+  grid.addEventListener('touchend', () => { dragging = false; dragMode = null; });
+
+  function applyToBlock(el) {
+    const i = +el.dataset.i;
+    if (dragMode === 'add') {
+      if (onboardPhase === 0 && selected.size >= FIRST_RUN_CAP) {
+        updateGuide('lock'); return;
+      }
+      selected.add(i); el.classList.add('selected');
+    } else {
+      selected.delete(i); el.classList.remove('selected');
+    }
+    updateCount();
+    if (onboardPhase === 0) updateGuide('selecting');
+  }
+
+  function updateCount() {
+    document.getElementById('count-label').textContent =
+      `${selected.size} / ${TOTAL} blocks selected`;
+  }
+
+  function updateGuide(event) {
+    const banner = document.getElementById('guide-banner');
+    const text   = document.getElementById('guide-text');
+    if (event === 'lock') {
+      banner.style.borderColor = 'var(--train)';
+      text.innerHTML = `You've selected ${FIRST_RUN_CAP} blocks — that's enough for your first run. Click <strong>Train</strong> to see how your model does!`;
+    } else if (event === 'selecting' && selected.size > 0) {
+      banner.style.borderColor = 'var(--accent)';
+      text.innerHTML = `Good — you've picked ${selected.size} block${selected.size > 1 ? 's' : ''}. Click <strong>Train</strong> when you're ready, or grab a few more.`;
+    }
+  }
+
+  function clearSelection() {
+    selected.clear();
+    document.querySelectorAll('.block').forEach(b => b.classList.remove('selected'));
+    updateCount();
+  }
+
+  // ── Model panel ───────────────────────────────────────────────────────
+  function renderModelButtons() {
+    const container = document.getElementById('model-buttons');
+    container.innerHTML = '';
+    MODEL_SETS[currentModelSet].forEach((name, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'model-btn' +
+        (i === selectedModel ? ' active' : '') +
+        (modelsTried.has(i)  ? ' tried'  : '');
+      btn.textContent = name;
+      btn.onclick = () => { selectedModel = i; renderModelButtons(); };
+      container.appendChild(btn);
+    });
+  }
+
+  function showModelPanel() {
+    document.getElementById('model-panel').style.display = 'block';
+    document.getElementById('models-btn').style.display  = '';
+    renderModelButtons();
+    const banner = document.getElementById('guide-banner');
+    banner.style.display      = 'flex';
+    banner.style.borderColor  = 'var(--train)';
+    document.getElementById('guide-text').innerHTML =
+      `Each model learns differently — try all <strong>6 models</strong> to unlock the next stage.`;
+  }
+
+  function advanceToModelPhase() {
+    onboardPhase = 3;
+    State.setLevel(1, { modelsUnlocked: true });
+    Log.event('models_unlocked', { level: 1 });
+    const savedSet = State.get('modelSet');
+    if (savedSet) {
+      currentModelSet = savedSet;
+      showModelPanel();
+    } else {
+      document.getElementById('modelset-title').textContent = 'Great work!';
+      document.getElementById('modelset-desc').textContent  =
+        "You've unlocked multiple models. First, pick a naming style for them.";
+      document.getElementById('modelset-overlay').style.display = 'flex';
+    }
+  }
+
+  function pickModelSet(set) {
+    currentModelSet = set;
+    State.set('modelSet', set);
+    document.getElementById('modelset-overlay').style.display = 'none';
+    if (onboardPhase >= 3) showModelPanel();
+  }
+
+  function showModelPicker() {
+    document.getElementById('modelset-title').textContent = 'Choose Your Models';
+    document.getElementById('modelset-desc').textContent  =
+      'Pick a naming style for the 6 models. You can change this anytime.';
+    document.getElementById('modelset-overlay').style.display = 'flex';
+  }
+
+  // ── Run history ───────────────────────────────────────────────────────
+  function renderHistory(newBest) {
+    const panel = document.getElementById('history-panel');
+    const list  = document.getElementById('history-list');
+    if (allRuns.length < 2) { panel.style.display = 'none'; return; }
+    panel.style.display = 'block';
+    list.innerHTML = '';
+
+    list.appendChild(makeRunEntry(allRuns[1], 'previous', false));
+
+    const divider = document.createElement('div');
+    divider.style.cssText = 'font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-top:8px;margin-bottom:4px;';
+    divider.textContent = 'Top 3';
+    list.appendChild(divider);
+
+    [...allRuns].sort((a, b) => b.pct - a.pct).slice(0, 3).forEach((run, rank) => {
+      const isNewBest = newBest && rank === 0 && run === allRuns[0];
+      list.appendChild(makeRunEntry(run, 'top', isNewBest, rank + 1));
+    });
+  }
+
+  function makeRunEntry(run, type, isNewBest, rank) {
+    const el  = document.createElement('div');
+    el.className = 'run-entry' + (isNewBest ? ' new-best' : '');
+
+    const tag = document.createElement('span');
+    tag.className = 'run-tag ' + (type === 'previous' ? 'tag-previous' : rank === 1 ? 'tag-best' : 'tag-top');
+    tag.textContent = type === 'previous' ? 'Previous' : `#${rank}`;
+    el.appendChild(tag);
+
+    const runId = document.createElement('span');
+    runId.className = 'run-id';
+    runId.textContent = `Run ${run.id}`;
+    el.appendChild(runId);
+
+    if (run.model) {
+      const ml = document.createElement('span');
+      ml.style.cssText = 'font-size:0.8rem;font-weight:700;color:var(--accent);';
+      ml.textContent = run.model;
+      el.appendChild(ml);
+    }
+
+    if (isNewBest) {
+      const star = document.createElement('span');
+      star.textContent = '★ New best!';
+      star.style.cssText = 'color:var(--train);font-weight:700;font-size:0.8rem;';
+      el.appendChild(star);
+    }
+
+    const data = document.createElement('span');
+    data.className = 'run-data';
+    data.textContent = `${run.blocks} / ${TOTAL} blocks`;
+    el.appendChild(data);
+
+    const right = document.createElement('div');
+    right.className = 'run-right';
+    const barBg = document.createElement('div');
+    barBg.className = 'run-mini-bar-bg';
+    const bar = document.createElement('div');
+    bar.className = 'run-mini-bar';
+    bar.style.width = run.pct + '%';
+    barBg.appendChild(bar);
+    right.appendChild(barBg);
+    const score = document.createElement('span');
+    score.className = 'run-score';
+    score.textContent = run.pct + '%';
+    right.appendChild(score);
+    el.appendChild(right);
+    return el;
+  }
+
+  // ── Training ──────────────────────────────────────────────────────────
+  function trainModel() {
+    if (selected.size === 0 || training) return;
+    training = true;
+
+    const trainBtn    = document.querySelector('.btn-train');
+    trainBtn.disabled = true;
+    trainBtn.textContent = '⏳ Training…';
+
+    const duration      = (selected.size / TOTAL) * 5000;
+    const start         = performance.now();
+    const progressDiv   = document.getElementById('training-progress');
+    const progressBar   = document.getElementById('progress-bar');
+    const progressLabel = document.getElementById('progress-label');
+
+    document.getElementById('accuracy-panel').style.display = 'none';
+    progressDiv.style.display = 'block';
+
+    function tick() {
+      const raw   = (performance.now() - start) / duration;
+      const eased = raw < 0.5 ? 2*raw*raw : 1 - Math.pow(-2*raw+2, 2)/2;
+      const pct   = Math.min(100, Math.round(eased * 100));
+      progressBar.style.width  = pct + '%';
+      progressLabel.textContent =
+        `Training on example ${Math.min(selected.size, Math.ceil(eased * selected.size))} / ${selected.size}`;
+      raw < 1 ? requestAnimationFrame(tick) : finishTraining();
+    }
+    requestAnimationFrame(tick);
+
+    function finishTraining() {
+      progressDiv.style.display = 'none';
+      training = false;
+      trainBtn.disabled    = false;
+      trainBtn.textContent = '▶ Train';
+
+      const ratio     = selected.size / TOTAL;
+      const curve     = MODEL_CURVES[selectedModel];
+      const acc       = Math.min(0.98, Math.max(0.50,
+        curve.base + ratio * curve.scale + curve.jitter * (Math.random() - 0.5)));
+      const pct       = Math.round(acc * 100);
+      const modelName = onboardPhase >= 3 ? MODEL_SETS[currentModelSet][selectedModel] : null;
+
+      const prevBest  = allRuns.length ? Math.max(...allRuns.map(r => r.pct)) : -1;
+      const isNewBest = pct > prevBest;
+      allRuns.unshift({ pct, blocks: selected.size, id: allRuns.length + 1, model: modelName });
+
+      // Persist summary to state & log
+      const lvl = State.getLevel(1);
+      State.setLevel(1, { runCount: lvl.runCount + 1, bestAccuracy: Math.max(lvl.bestAccuracy, pct) });
+      Log.event('train', { level: 1, model: modelName, blocks: selected.size, accuracy: pct });
+
+      // Show result
+      const panel = document.getElementById('accuracy-panel');
+      panel.style.display = 'block';
+      document.getElementById('accuracy-model-label').textContent =
+        modelName ? `${modelName} accuracy` : 'Train accuracy';
+      requestAnimationFrame(() => {
+        document.getElementById('train-bar').style.transition = 'width 0.6s ease';
+        document.getElementById('train-bar').style.width      = pct + '%';
+        document.getElementById('train-pct').textContent      = pct + '%';
+      });
+
+      renderHistory(isNewBest);
+
+      // ── Onboarding state machine ──────────────────────────────────────
+      const banner = document.getElementById('guide-banner');
+      const text   = document.getElementById('guide-text');
+
+      if (onboardPhase === 0) {
+        onboardPhase = 1;
+        banner.style.display     = 'flex';
+        banner.style.borderColor = 'var(--accent)';
+        text.innerHTML = `Not bad! But notice that accuracy — now try selecting <strong>more data</strong> and training again to see what happens.`;
+
+      } else if (onboardPhase === 1) {
+        if (pct >= ACCURACY_THRESHOLD) {
+          advanceToModelPhase();
+        } else {
+          onboardPhase = 2;
+          banner.style.display     = 'flex';
+          banner.style.borderColor = 'var(--accent)';
+          text.innerHTML = `Getting there! See if you can hit <strong>${ACCURACY_THRESHOLD}%</strong> — try adding even more blocks and training again.`;
+        }
+
+      } else if (onboardPhase === 2) {
+        if (pct >= ACCURACY_THRESHOLD) {
+          advanceToModelPhase();
+        } else {
+          phase2Tries++;
+          if (phase2Tries >= 3) {
+            banner.style.display     = 'flex';
+            banner.style.borderColor = 'var(--accent)';
+            text.innerHTML = `Still under ${ACCURACY_THRESHOLD}%? Try selecting <strong>as many blocks as you can</strong> — the more training data, the better.`;
+          }
+        }
+
+      } else if (onboardPhase === 3) {
+        modelsTried.add(selectedModel);
+        State.setLevel(1, { modelsTried: [...modelsTried] });
+        renderModelButtons();
+        if (modelsTried.size >= 6) {
+          const deploySection = document.getElementById('deploy-section');
+          if (deploySection.style.display === 'none') {
+            showDeploySection();
+            Log.event('all_models_tried', { level: 1 });
+          }
+        }
+      }
+    }
+  }
+
+  function goNextStage() {
+    State.setLevel(1, { completed: true });
+    Log.event('level_complete', { level: 1 });
+    window.location.href = 'level2.html';
+  }
+
+  // ── Theme picker ──────────────────────────────────────────────────────
+  function showThemePicker() {
+    document.getElementById('theme-overlay').style.display = 'flex';
+  }
+
+  function changeTheme(t) {
+    State.set('theme', t);
+    Themes.apply(t);
+    document.getElementById('theme-overlay').style.display = 'none';
+    Log.event('theme_change', { theme: t });
+  }
+
+  // ── Deploy (Level 1) ──────────────────────────────────────────────────
+  // Real-world accuracies: deliberately inverted from training rankings.
+  // Training best→worst: 4 > 1 > 0 ≈ 5 > 2 > 3
+  // Real-world best→worst: 2 > 3 > 5 > 0 > 1 > 4
+  // This ensures students always see a rank flip on deploy.
+  const REAL_WORLD_ACCS = [0.70, 0.64, 0.79, 0.75, 0.61, 0.72];
+
+  let deployModelIdx = 0;
+  let l1Deployed     = false;
+
+  function showDeploySection() {
+    deployModelIdx = selectedModel; // default to currently selected
+    const section = document.getElementById('deploy-section');
+    section.style.display = 'block';
+    renderDeployModelBtns();
+
+    const banner = document.getElementById('guide-banner');
+    const text   = document.getElementById('guide-text');
+    banner.style.display      = 'flex';
+    banner.style.borderColor  = 'var(--train)';
+    text.innerHTML = `You've tried all 6 models. Now pick one to <strong>deploy</strong> — and see how it holds up on data it's never seen before.`;
+
+    setTimeout(() => section.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+  }
+
+  function renderDeployModelBtns() {
+    const labels = MODEL_SETS[currentModelSet];
+    const c = document.getElementById('deploy-model-row');
+    c.innerHTML = '';
+    labels.forEach((lbl, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'model-btn' + (i === deployModelIdx ? ' active' : '');
+      btn.textContent = lbl;
+      btn.onclick = () => { deployModelIdx = i; renderDeployModelBtns(); };
+      c.appendChild(btn);
+    });
+  }
+
+  function getRealWorldAccs(deployIdx) {
+    // Add small noise to each model's real-world base accuracy
+    const accs = REAL_WORLD_ACCS.map(a => a + 0.03 * (Math.random() - 0.5));
+
+    // Find the natural real-world winner
+    const bestIdx = accs.reduce((bi, a, i) => a > accs[bi] ? i : bi, 0);
+
+    // If the deployed model would naturally win (user got lucky), shift best to next-best
+    if (bestIdx === deployIdx) {
+      const nextBest = accs.map((a, i) => [a, i])
+                           .filter(([, i]) => i !== deployIdx)
+                           .sort(([a], [b]) => b - a)[0][1];
+      accs[nextBest] = accs[deployIdx] + 0.04 + Math.random() * 0.03;
+    }
+    return accs;
+  }
+
+  function doL1Deploy() {
+    if (l1Deployed || training) return;
+    l1Deployed = true;
+    document.getElementById('deploy-btn').disabled    = true;
+    document.getElementById('deploy-btn').textContent = 'Deploying…';
+
+    const realAccs      = getRealWorldAccs(deployModelIdx);
+    const deployedReal  = realAccs[deployModelIdx];
+    const bestRealIdx   = realAccs.reduce((bi, a, i) => a > realAccs[bi] ? i : bi, 0);
+
+    // Best training accuracy we observed for the deployed model
+    const deployedName  = MODEL_SETS[currentModelSet][deployModelIdx];
+    const modelRuns     = allRuns.filter(r => r.model === deployedName);
+    const bestTrainPct  = modelRuns.length > 0
+      ? Math.max(...modelRuns.map(r => r.pct))
+      : Math.max(...allRuns.filter(r => r.pct).map(r => r.pct), 80);
+
+    // Animate 30 data points
+    const streamEl = document.getElementById('l1-stream');
+    streamEl.style.display = 'grid';
+    streamEl.innerHTML = '';
+    const dots = Array.from({ length: 30 }, () => {
+      const d = document.createElement('div');
+      d.className = 'deploy-dot';
+      streamEl.appendChild(d);
+      return d;
+    });
+
+    let correct = 0, i = 0;
+    const tick = setInterval(() => {
+      if (i === 30) {
+        clearInterval(tick);
+        finalizeL1Deploy(bestTrainPct, correct / 30, realAccs, bestRealIdx, deployedName);
+        return;
+      }
+      const hit = Math.random() < deployedReal;
+      if (hit) correct++;
+      dots[i].className = 'deploy-dot ' + (hit ? 'correct' : 'wrong');
+      i++;
+    }, 110);
+
+    Log.event('l1_deploy', { deployModelIdx, deployedReal, bestRealIdx });
+  }
+
+  function finalizeL1Deploy(trainPct, realAcc, allRealAccs, bestRealIdx, deployedName) {
+    const realPct       = Math.round(realAcc * 100);
+    const bestModelName = MODEL_SETS[currentModelSet][bestRealIdx];
+    const bestRealPct   = Math.round(allRealAccs[bestRealIdx] * 100);
+    const gap           = trainPct - realPct;
+
+    document.getElementById('l1-results').style.display = 'block';
+    document.getElementById('l1-cmp-train').textContent = trainPct + '%';
+    document.getElementById('l1-cmp-real').textContent  = realPct + '%';
+    document.getElementById('l1-cmp-real').style.color  = gap > 5 ? 'var(--test)' : 'var(--train)';
+
+    const msg = document.getElementById('l1-reveal-msg');
+    msg.style.display    = 'block';
+    msg.style.border     = '1px solid var(--test)';
+    msg.style.background = 'color-mix(in srgb, var(--test) 10%, var(--surface))';
+    msg.innerHTML = `
+      🔴 <strong>${gap}% gap.</strong> <strong>${deployedName}</strong> looked great on your training data (${trainPct}%)
+      — a completely reasonable pick. But on real users it only managed ${realPct}%.<br><br>
+      <strong>${bestModelName}</strong> would have hit <strong>${bestRealPct}%</strong> in production — but your training
+      data gave you no way to know that.<br><br>
+      <em>This is why training accuracy can be misleading. In Level 2, you'll hold back a test set before training
+      so you have a real estimate — not just a training score.</em>
+    `;
+
+    State.setLevel(1, { completed: true });
+    Log.event('l1_deploy_done', { trainPct, realPct, bestRealIdx, bestRealPct });
+
+    setTimeout(() => {
+      document.getElementById('next-stage-container').style.display = 'block';
+      document.getElementById('next-stage-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      const banner = document.getElementById('guide-banner');
+      banner.style.borderColor = 'var(--accent)';
+      document.getElementById('guide-text').innerHTML =
+        `Now you've seen the problem firsthand. Level 2 introduces the solution: a held-out test set.`;
+    }, 700);
+  }
+</script>
+</body>
+</html>

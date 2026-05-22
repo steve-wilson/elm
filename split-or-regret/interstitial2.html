@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Split or Regret — Before Level 3</title>
+<script>
+  try {
+    const s = JSON.parse(localStorage.getItem('sor_state') || '{}');
+    document.documentElement.className = 'theme-' + (s.theme || 'clean');
+  } catch(e) {}
+</script>
+<link rel="stylesheet" href="css/shared.css">
+<style>
+  body {
+    min-height: 100vh; display: flex; align-items: center;
+    justify-content: center; background: rgba(0,0,0,0.72); padding: 24px;
+  }
+
+  .card {
+    background: white; border-radius: 14px; padding: 40px 44px;
+    max-width: 540px; width: 100%;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  /* ── Progress dots ── */
+  .progress { display: flex; gap: 8px; justify-content: center; margin-bottom: 32px; }
+  .pdot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #e5e7eb; transition: background 0.3s;
+  }
+  .pdot.active { background: #3b82f6; }
+  .pdot.done   { background: #10b981; }
+
+  /* ── Question ── */
+  .q-text {
+    font-size: 1.15rem; font-weight: 800; color: #1a1a2e;
+    line-height: 1.45; margin-bottom: 22px;
+  }
+
+  .options { display: flex; flex-direction: column; gap: 10px; }
+
+  .opt {
+    padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 8px;
+    background: white; cursor: pointer; text-align: left;
+    font-size: 0.92rem; line-height: 1.5; color: #374151;
+    transition: border-color 0.15s, background 0.15s; font-family: inherit;
+  }
+  .opt:hover:not(:disabled) { border-color: #93c5fd; background: #eff6ff; }
+  .opt.correct  { border-color: #10b981; background: #f0fdf4; color: #065f46; }
+  .opt.wrong    { border-color: #f87171; background: #fef2f2; color: #991b1b; }
+
+  .feedback {
+    display: none; margin-top: 14px; padding: 11px 14px;
+    border-radius: 8px; font-size: 0.88rem; line-height: 1.6;
+  }
+  .feedback.correct { background: #f0fdf4; border: 1px solid #bbf7d0; color: #065f46; }
+  .feedback.wrong   { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+
+  .next-btn {
+    display: none; margin-top: 20px; width: 100%; padding: 13px;
+    background: #3b82f6; color: white; border: none; border-radius: 8px;
+    font-size: 1rem; font-weight: 700; cursor: pointer;
+    transition: opacity 0.2s; font-family: inherit;
+  }
+  .next-btn:hover { opacity: 0.88; }
+
+  /* ── Conclusion ── */
+  #conclusion { display: none; }
+  #conclusion h2 {
+    font-size: 1.4rem; font-weight: 800; color: #1a1a2e; margin-bottom: 18px;
+  }
+  #conclusion p {
+    color: #374151; font-size: 0.97rem; line-height: 1.7; margin-bottom: 14px;
+  }
+  .key-term {
+    background: #eff6ff; border-left: 4px solid #3b82f6;
+    padding: 11px 16px; border-radius: 0 8px 8px 0;
+    font-size: 0.95rem; font-weight: 600; color: #1e40af;
+    margin: 18px 0 22px; line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="progress" id="progress"></div>
+
+  <div id="questions-container">
+    <div class="q-text" id="q-text"></div>
+    <div class="options" id="options"></div>
+    <div class="feedback" id="feedback"></div>
+    <button class="next-btn" id="next-btn" onclick="nextStep()"></button>
+  </div>
+
+  <div id="conclusion">
+    <h2>The split is a choice, not a formula</h2>
+    <p>More training data tends to produce a better model. More test data gives you a more reliable estimate of how that model will actually perform. Neither is free — every example you give to one side you take from the other.</p>
+    <p>In practice, 80% train / 20% test is a common starting point. But practitioners adjust it: with very small datasets they might keep more for testing; with enormous ones the exact ratio matters less.</p>
+    <div class="key-term">The harder problem: every time you use the test set to make a decision, it becomes a little less trustworthy as a benchmark.</div>
+    <p>In Level 3, you'll work with a setup that lets you make decisions freely — without touching the test set at all.</p>
+    <button class="next-btn" style="display:block;" onclick="goLevel3()">Start Level 3 →</button>
+  </div>
+</div>
+
+<script>
+const QUESTIONS = [
+  {
+    q: "You ran Level 2 twice — once with more training data, once with less. What effect did having more training data tend to have on accuracy?",
+    opts: [
+      {
+        text: "Accuracy went up — the model had more examples to learn from",
+        correct: true,
+        feedback: "Right. More training examples gives the model a wider view of the patterns it needs to recognise, so it generally performs better."
+      },
+      {
+        text: "Accuracy went down — too much data confuses the model",
+        correct: false,
+        feedback: "More data doesn't confuse a model — it helps it. The model gets a better sample of the underlying patterns."
+      },
+      {
+        text: "Accuracy stayed the same — the split doesn't affect the model",
+        correct: false,
+        feedback: "The split matters a lot. The model can only learn from the examples in its training set, so more training data changes what it can pick up."
+      },
+    ]
+  },
+  {
+    q: "When you held back more data for testing, what did that give you?",
+    opts: [
+      {
+        text: "A higher accuracy score",
+        correct: false,
+        feedback: "Not necessarily — holding back more data for testing means the model trains on less, which can actually lower accuracy. Think about what a larger test set does for the estimate itself."
+      },
+      {
+        text: "A more reliable estimate of real-world performance",
+        correct: true,
+        feedback: "Exactly. A larger test set means the accuracy score is based on more examples, so a single lucky or unlucky prediction has less influence on the final number."
+      },
+      {
+        text: "Faster training",
+        correct: false,
+        feedback: "A larger test set means a smaller training set, which would actually make training faster — but that's a side effect, not the meaningful benefit."
+      },
+      {
+        text: "No difference — test set size doesn't matter",
+        correct: false,
+        feedback: "It matters a lot. With very few test examples, one wrong prediction can swing your estimate by 10% or more. More examples smooth that out."
+      },
+    ]
+  },
+  {
+    q: "More training data helps the model. More test data makes the estimate more reliable. Given that trade-off, what split do you think practitioners most commonly use?",
+    opts: [
+      {
+        text: "50% train, 50% test",
+        correct: false,
+        feedback: "That gives you a very reliable estimate — but you're only training on half your data, which usually hurts the model more than it helps the estimate."
+      },
+      {
+        text: "80% train, 20% test",
+        correct: true,
+        feedback: "80/20 is the most common default. It gives the model enough data to learn well while keeping a meaningful slice for evaluation. That said, the right ratio depends on how much data you have in total."
+      },
+      {
+        text: "99% train, 1% test",
+        correct: false,
+        feedback: "With only 1% for testing, your estimate would be extremely noisy — a handful of examples can't reliably represent real-world performance."
+      },
+    ]
+  },
+  {
+    q: "In Level 2 you checked the test set multiple times — to compare models, to decide whether to tune more. What's the issue with doing that?",
+    opts: [
+      {
+        text: "Nothing — more information always helps you make better decisions",
+        correct: false,
+        feedback: "More information does help decisions, but those decisions shape what you do next. And whatever you do next affects the model you eventually evaluate on that same test set."
+      },
+      {
+        text: "Each time you use the test result to make a decision, that decision is reflected in the model you end up evaluating — so the test set is no longer measuring something it had no part in",
+        correct: true,
+        feedback: "Exactly. The test set is supposed to simulate the real world — data the model has never influenced. Once its results are guiding your choices, that isolation breaks down."
+      },
+      {
+        text: "The test set gets smaller each time you check it",
+        correct: false,
+        feedback: "Checking the test set doesn't remove examples — but it does erode something less tangible: the independence between your decisions and the benchmark you're using to evaluate them."
+      },
+    ]
+  },
+];
+
+let currentQ = 0;
+
+function renderProgress() {
+  const el = document.getElementById('progress');
+  el.innerHTML = '';
+  QUESTIONS.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'pdot' + (i < currentQ ? ' done' : i === currentQ ? ' active' : '');
+    el.appendChild(d);
+  });
+}
+
+function renderQuestion() {
+  const q = QUESTIONS[currentQ];
+  document.getElementById('q-text').textContent = q.q;
+
+  const optEl = document.getElementById('options');
+  optEl.innerHTML = '';
+  q.opts.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'opt';
+    btn.textContent = opt.text;
+    btn.onclick = () => selectAnswer(opt, btn);
+    optEl.appendChild(btn);
+  });
+
+  const fb = document.getElementById('feedback');
+  fb.style.display = 'none';
+  fb.textContent = '';
+
+  document.getElementById('next-btn').style.display = 'none';
+  renderProgress();
+}
+
+function selectAnswer(opt, btn) {
+  const fb = document.getElementById('feedback');
+  fb.textContent = opt.feedback;
+
+  if (opt.correct) {
+    document.querySelectorAll('.opt').forEach(b => { b.onclick = null; b.disabled = true; });
+    btn.classList.add('correct');
+    fb.className = 'feedback correct';
+    fb.style.display = 'block';
+    const nb = document.getElementById('next-btn');
+    nb.textContent = currentQ < QUESTIONS.length - 1 ? 'Next →' : 'See the takeaway →';
+    nb.style.display = 'block';
+  } else {
+    btn.classList.add('wrong');
+    btn.onclick = null;
+    btn.disabled = true;
+    fb.className = 'feedback wrong';
+    fb.style.display = 'block';
+  }
+}
+
+function nextStep() {
+  currentQ++;
+  if (currentQ < QUESTIONS.length) {
+    renderQuestion();
+  } else {
+    document.getElementById('questions-container').style.display = 'none';
+    document.getElementById('conclusion').style.display = 'block';
+    document.querySelectorAll('.pdot').forEach(d => { d.className = 'pdot done'; });
+  }
+}
+
+function goLevel3() {
+  window.location.href = 'level3.html';
+}
+
+renderQuestion();
+</script>
+</body>
+</html>

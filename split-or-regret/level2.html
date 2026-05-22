@@ -25,22 +25,17 @@
 .split-ct  { font-size: 0.78rem; color: var(--muted); font-weight: 400; margin-left: 4px; }
 #split-slider { width: 100%; margin: 8px 0; accent-color: var(--accent); cursor: pointer; }
 .split-hint { text-align: center; font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+#data-grid .block { cursor: default; }
 
 #guide-banner {
   border: 1px solid var(--accent); border-radius: var(--radius);
-  padding: 12px 16px; margin-bottom: 16px; font-size: 0.9rem; line-height: 1.5;
+  padding: 12px 16px; margin-bottom: 16px;
   background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  display: flex; align-items: flex-start; gap: 12px; cursor: pointer;
 }
 
 .model-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 
-#peek-counter {
-  display: none; padding: 5px 13px; border-radius: 20px; font-size: 0.82rem;
-  font-weight: 600; border: 1px solid var(--border); color: var(--muted);
-  margin-left: auto; white-space: nowrap;
-}
-#peek-counter.peek-warn   { border-color: #f59e0b; color: #b45309; background: color-mix(in srgb, #f59e0b 12%, var(--surface)); }
-#peek-counter.peek-danger { border-color: #ef4444; color: #b91c1c; background: color-mix(in srgb, #ef4444 12%, var(--surface)); }
 
 #progress-panel {
   background: var(--surface); border: 1px solid var(--border);
@@ -74,24 +69,6 @@
 .msg-ok  { border: 1px solid var(--train); background: color-mix(in srgb, var(--train) 10%, var(--surface)); }
 .msg-bad { border: 1px solid var(--test);  background: color-mix(in srgb, var(--test)  10%, var(--surface)); }
 
-#checkin-section {
-  display: none; background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 20px; margin-top: 16px; text-align: center;
-}
-.checkin-row { display: flex; gap: 10px; justify-content: center; margin: 12px 0; flex-wrap: wrap; }
-.ci-btn {
-  padding: 9px 18px; border: 2px solid var(--border); border-radius: var(--radius);
-  background: var(--bg); color: var(--text); cursor: pointer;
-  font-family: var(--font); font-size: 0.9rem; font-weight: 600; transition: all 0.15s;
-}
-.ci-btn:hover  { border-color: var(--accent); }
-.ci-btn.active { border-color: var(--accent); background: var(--accent); color: white; }
-#ci-text {
-  width: 100%; max-width: 440px; padding: 8px 12px;
-  border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--bg); color: var(--text); font-family: var(--font);
-  font-size: 0.85rem; resize: vertical; min-height: 56px;
-}
 
 #next-section {
   display: none; background: var(--surface); border: 1px solid var(--border);
@@ -99,6 +76,20 @@
 }
 #next-section p { color: var(--muted); font-size: 0.9rem; line-height: 1.6; max-width: 500px; margin: 0 auto 18px; }
 
+.train-sweep {
+  position: absolute; top: 0; bottom: 0; width: 22%;
+  background: linear-gradient(90deg, transparent, var(--sweep-color) 50%, transparent);
+  pointer-events: none; z-index: 2;
+  animation: train-sweep-anim ease-in-out forwards;
+}
+@keyframes train-sweep-anim {
+  from { left: -22%; }
+  to   { left: 105%; }
+}
+
+@media (max-width: 600px) {
+  #history-panel > div { grid-template-columns: 1fr; }
+}
 @media (max-width: 480px) {
   .deploy-stream  { grid-template-columns: repeat(10, 1fr); }
   .cmp-val        { font-size: 1.4rem; }
@@ -141,27 +132,52 @@
       <h1>Split or Regret</h1>
       <span class="level-badge">Level 2</span>
     </div>
-    <div style="display:flex;gap:8px;">
-      <button class="header-btn" id="models-btn" onclick="showModelPicker()" style="display:none;">Models</button>
-      <button class="header-btn" onclick="confirmStartOver()">↺ Restart</button>
-      <button class="header-btn" onclick="showThemePicker()">Theme</button>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button id="hint-btn" onclick="showHint()" style="display:none;font-size:0.78rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--radius);padding:4px 10px;cursor:pointer;line-height:1.4;font-family:var(--font);">💡 hint</button>
+      <div style="position:relative;">
+        <button id="menu-btn" onclick="toggleMenu()">&#9776;</button>
+        <div id="menu-dropdown">
+          <button class="menu-item" onclick="menuAction('theme')">⚙ Theme</button>
+          <button class="menu-item" id="menu-models" onclick="menuAction('models')" style="display:none;">⚙ Model Names</button>
+          <hr class="menu-divider">
+          <button class="menu-item danger" onclick="menuAction('reset')">↺ Reset Level</button>
+          <button class="menu-item danger" onclick="menuAction('restart-game')">↩ Restart Game</button>
+        </div>
+      </div>
     </div>
   </header>
 
   <main>
-    <div id="guide-banner">
-      ✂️ <strong>Now you can split your data.</strong> Drag the slider to decide where training ends and the test set begins. Train a model, then check how it does on held-out data — but pay attention to how many times you peek!
+    <div id="guide-banner" onclick="this.style.display='none';document.getElementById('hint-btn').style.display='';">
+      <span id="guide-emoji" style="font-size:1.2rem;line-height:1;flex-shrink:0;">✂️</span>
+      <span id="guide-text" style="font-size:0.9rem;line-height:1.5;color:var(--text);flex:1;">
+        <strong>Now you can split your data.</strong> Drag the slider to choose how much to hold back, then pick a model and train.
+      </span>
+      <span style="font-size:0.75rem;color:var(--muted);white-space:nowrap;padding-top:2px;flex-shrink:0;">tap to dismiss</span>
     </div>
 
     <!-- Grid + slider -->
     <div class="split-container">
       <div class="split-row">
         <span class="split-lbl lbl-train">Train <span class="split-ct" id="train-ct"></span></span>
+        <div id="class-legend" style="display:flex;gap:12px;font-size:0.72rem;color:var(--muted);align-items:center;">
+          <span style="display:flex;align-items:center;gap:4px;">
+            <svg width="9" height="9" viewBox="0 0 10 10" style="color:var(--block-selected);flex-shrink:0;"><rect fill="currentColor" width="10" height="10"/></svg>
+            A: <span id="legend-a-count">—</span>
+          </span>
+          <span style="display:flex;align-items:center;gap:4px;">
+            <svg width="9" height="9" viewBox="0 0 10 10" style="color:var(--block-selected);flex-shrink:0;"><rect fill="currentColor" width="10" height="10"/><circle fill="var(--surface)" cx="5" cy="5" r="2.8"/></svg>
+            B: <span id="legend-b-count">—</span>
+          </span>
+        </div>
         <span class="split-lbl lbl-test">Test <span class="split-ct" id="test-ct"></span></span>
       </div>
       <input type="range" id="split-slider" min="10" max="110" value="96">
-      <div id="data-grid" style="pointer-events:none;"></div>
-      <div class="split-hint">Drag to adjust the train / test split</div>
+      <div id="data-grid"></div>
+      <div class="split-hint" style="display:flex;align-items:center;justify-content:center;gap:6px;">
+        Drag to adjust the train / test split
+        <button class="info-btn" onclick="showTooltip(this,event)" data-tip="split">i</button>
+      </div>
     </div>
 
     <!-- Model panel -->
@@ -173,9 +189,7 @@
     <!-- Controls -->
     <div id="controls">
       <button class="btn btn-train" id="train-btn" onclick="doTrain()">▶ Train</button>
-      <button class="btn btn-secondary" id="tune-btn" onclick="doTune()" disabled>⚙ Tune</button>
-      <button class="btn btn-secondary" id="test-btn" onclick="doCheckTest()" disabled>🔍 Check Test</button>
-      <div id="peek-counter">👁 <span id="peek-num">0</span> peek<span id="peek-s">s</span></div>
+      <button class="info-btn" onclick="showTooltip(this,event)" data-tip="train">i</button>
     </div>
 
     <!-- Progress -->
@@ -189,12 +203,18 @@
     <div id="accuracy-panel">
       <div class="section-label">Model performance</div>
       <div class="accuracy-row">
-        <div class="accuracy-label">Train accuracy</div>
+        <div class="accuracy-label" style="display:flex;align-items:center;gap:5px;">
+          Train accuracy
+          <button class="info-btn" onclick="showTooltip(this,event)" data-tip="train-acc">i</button>
+        </div>
         <div class="accuracy-bar-bg"><div class="accuracy-bar" id="train-bar" style="width:0%"></div></div>
         <div class="accuracy-pct" id="train-pct">—</div>
       </div>
       <div class="accuracy-row" id="test-acc-row" style="display:none;">
-        <div class="accuracy-label" style="color:var(--test);">Test accuracy</div>
+        <div class="accuracy-label" style="color:var(--test);display:flex;align-items:center;gap:5px;">
+          Test accuracy
+          <button class="info-btn" onclick="showTooltip(this,event)" data-tip="test-acc">i</button>
+        </div>
         <div class="accuracy-bar-bg"><div class="accuracy-bar" id="test-bar" style="width:0%;background:var(--test);"></div></div>
         <div class="accuracy-pct" id="test-pct">—</div>
       </div>
@@ -202,18 +222,27 @@
 
     <!-- Run history -->
     <div id="history-panel" style="display:none;margin-top:16px;">
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
-        <div class="section-label" style="margin-bottom:12px;">Run History</div>
-        <div id="history-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+          <div class="section-label" style="margin-bottom:12px;">Top 3 — Train</div>
+          <div id="history-train" style="display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+          <div class="section-label" style="margin-bottom:12px;">Top 3 — Test</div>
+          <div id="history-test" style="display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
       </div>
     </div>
 
     <!-- Deploy -->
-    <div id="deploy-section">
+    <div id="deploy-section" style="display:none;">
       <div class="section-label" style="margin-bottom:12px;">🚀 Deploy a model</div>
       <p style="font-size:0.88rem;color:var(--muted);margin-bottom:12px;">Select which model to ship. Real users will start arriving immediately.</p>
       <div class="model-row" id="deploy-buttons"></div>
-      <button class="btn btn-train" id="deploy-btn" onclick="doDeploy()" style="margin-top:14px;">🚀 Deploy</button>
+      <span style="display:inline-flex;align-items:center;gap:6px;margin-top:14px;">
+        <button class="btn btn-train" id="deploy-btn" onclick="doDeploy()">🚀 Deploy</button>
+        <button class="info-btn" onclick="showTooltip(this,event)" data-tip="deploy">i</button>
+      </span>
       <div class="deploy-stream" id="deploy-stream" style="display:none;"></div>
       <div class="deploy-compare" id="deploy-compare" style="display:none;">
         <div class="cmp-card">
@@ -228,34 +257,70 @@
       <div id="outcome-msg" style="display:none;"></div>
     </div>
 
-    <!-- Check-in -->
-    <div id="checkin-section">
-      <h3 style="font-size:1rem;font-weight:700;margin-bottom:4px;">How's it going?</h3>
-      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:4px;">Quick check-in — totally optional.</p>
-      <div class="checkin-row">
-        <button class="ci-btn" onclick="selectCheckin(this,'great')">😊 Great</button>
-        <button class="ci-btn" onclick="selectCheckin(this,'okay')">😐 Okay</button>
-        <button class="ci-btn" onclick="selectCheckin(this,'struggling')">😓 Struggling</button>
-      </div>
-      <textarea id="ci-text" placeholder="Any feedback to help improve this? (optional)"></textarea>
-      <div style="margin-top:12px;">
-        <button class="btn btn-secondary" onclick="submitCheckin()" style="font-size:0.85rem;">Submit feedback</button>
+    <!-- Round comparison -->
+    <div id="comparison-section" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-top:16px;">
+      <div class="section-label" style="margin-bottom:14px;">Your two runs</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="cmp-card" id="cmp-r1"></div>
+        <div class="cmp-card" id="cmp-r2"></div>
       </div>
     </div>
 
     <!-- Next stage -->
-    <div id="next-section">
-      <p>You've seen how peeking at the test set contaminates your accuracy estimate — even when you're only making small decisions. In Level 3, you'll add a <strong>validation set</strong> so you can iterate freely while keeping the test set truly untouched.</p>
-      <button class="btn btn-next-stage" onclick="goNextStage()">Level 3: Add a Validation Set →</button>
-    </div>
+    <div id="next-section"></div>
   </main>
 </div>
+
+<div id="tooltip"></div>
 
 <script src="js/state.js"></script>
 <script src="js/log.js"></script>
 <script src="js/themes.js"></script>
 <script>
+// ── Tooltips ─────────────────────────────────────────────────────────────────
+const TIPS = {
+  'split':      'Drag to choose what fraction of data to hold back for testing. The model only trains on data to the left of this line.',
+  'split-locked': 'You\'ve already trained a model using this split — let\'s keep it consistent so the results stay comparable.',
+  'train':      'The model looks at the training portion of the data and learns to recognise patterns.',
+  'train-acc':  'How often the model correctly predicted the label on the data it was trained on.',
+  'test-acc':   'How often the model correctly predicted the label on the held-out test examples. Because the model never trained on these, this is a more honest estimate than training accuracy.',
+  'deploy':     'Ship the model to real users. You\'ll see how real-world accuracy compares to your test estimate.',
+};
+
+function showTooltip(btn, e) {
+  e.stopPropagation();
+  const tip = document.getElementById('tooltip');
+  if (tip.style.display === 'block' && tip.dataset.src === btn.dataset.tip) {
+    tip.style.display = 'none'; return;
+  }
+  tip.textContent = TIPS[btn.dataset.tip] || '';
+  tip.dataset.src = btn.dataset.tip;
+  tip.style.display = 'block';
+  const r  = btn.getBoundingClientRect();
+  const tw = Math.min(260, window.innerWidth - 20);
+  tip.style.maxWidth = tw + 'px';
+  let left = Math.min(r.left, window.innerWidth - tw - 10);
+  let top  = r.bottom + 6;
+  if (top + 80 > window.innerHeight) top = r.top - tip.offsetHeight - 6;
+  tip.style.left = Math.max(10, left) + 'px';
+  tip.style.top  = top + 'px';
+}
+
+document.addEventListener('click', () => {
+  const tip = document.getElementById('tooltip');
+  if (tip) tip.style.display = 'none';
+});
+
 const TOTAL = 120;
+
+const SVG_A = `<svg viewBox="0 0 10 10"><rect class="block-fill" width="10" height="10"/></svg>`;
+const SVG_B = `<svg viewBox="0 0 10 10"><rect class="block-fill" width="10" height="10"/><circle class="block-hole" cx="5" cy="5" r="2.8"/></svg>`;
+
+let blockClasses = [];
+function initBlockClasses() {
+  blockClasses = Array.from({length: TOTAL}, () => Math.random() < 0.5 ? 'A' : 'B');
+}
+initBlockClasses();
 
 const MODEL_SETS = {
   greek:     ['α','β','γ','δ','ε','ζ'],
@@ -279,9 +344,15 @@ let deployMdl   = 0;
 let peekCount   = 0;
 let busy        = false;
 let deployed    = false;
-let checkinVal  = null;
+let splitLocked    = false;
+let round1         = null;
+let round2         = null;
+let isRound2       = false;
+let originalSplit  = null;
+const ROUND2_DELTA = Math.round(TOTAL * 0.15); // 18 blocks = 15%
+let _pulseEl       = null;
 
-const mSt = CURVES.map(() => ({ trained:false, tuneCount:0, trainAcc:null, testAcc:null, tested:false }));
+const mSt = CURVES.map(() => ({ trained:false, trainAcc:null, testAcc:null, tested:false }));
 
 let l2Runs  = [];
 let l2RunCnt = 0;
@@ -293,7 +364,7 @@ if (!State.get('theme')) {
   document.getElementById('theme-overlay').style.display = 'flex';
 }
 if (State.get('modelSet')) {
-  document.getElementById('models-btn').style.display = '';
+  document.getElementById('menu-models').style.display = '';
 }
 
 const lvl2saved = State.getLevel(2) || {};
@@ -301,8 +372,10 @@ peekCount = lvl2saved.testPeekCount || 0;
 
 renderGrid();
 updateCounts();
+updateClassLegend();
 renderModelBtns();
-if (peekCount > 0) renderPeek();
+updateBanner();
+setPulse('split-slider');
 
 document.getElementById('split-slider').addEventListener('input', function() {
   splitPt = +this.value;
@@ -310,16 +383,45 @@ document.getElementById('split-slider').addEventListener('input', function() {
   updateCounts();
   mSt.forEach(m => { m.tested = false; });
   document.getElementById('test-acc-row').style.display = 'none';
-  updateBanner();
+  if (!deployed) document.getElementById('deploy-section').style.display = 'none';
+  if (isRound2 && !splitLocked) {
+    checkRound2Gate();
+  } else {
+    updateBanner();
+    if (!mSt.some(m => m.trained)) setPulse('train-btn');
+    else clearPulse();
+  }
 });
 
 // ── Grid ──────────────────────────────────────────────────────────────────────
+function showHoverTip(text, x, y) {
+  const tip = document.getElementById('tooltip');
+  tip.textContent = text;
+  tip.dataset.src = '';
+  tip.style.maxWidth = '220px';
+  tip.style.display = 'block';
+  tip.style.left = Math.max(10, Math.min(x + 14, window.innerWidth - 230)) + 'px';
+  tip.style.top  = (y + 18) + 'px';
+}
+function hideHoverTip() { document.getElementById('tooltip').style.display = 'none'; }
+
+function updateClassLegend() {
+  const countA = blockClasses.filter(c => c === 'A').length;
+  document.getElementById('legend-a-count').textContent = countA;
+  document.getElementById('legend-b-count').textContent = TOTAL - countA;
+}
+
 function renderGrid() {
   const g = document.getElementById('data-grid');
   g.innerHTML = '';
   for (let i = 0; i < TOTAL; i++) {
     const b = document.createElement('div');
     b.className = 'block ' + (i < splitPt ? 'train' : 'test');
+    b.innerHTML = blockClasses[i] === 'A' ? SVG_A : SVG_B;
+    b.addEventListener('mouseenter', e => {
+      showHoverTip(`${i < splitPt ? 'Train' : 'Test'} · ID ${i}: Class ${blockClasses[i]}`, e.clientX, e.clientY);
+    });
+    b.addEventListener('mouseleave', hideHoverTip);
     g.appendChild(b);
   }
 }
@@ -361,9 +463,6 @@ function selectModel(i) {
   } else {
     document.getElementById('accuracy-panel').style.display = 'none';
   }
-  document.getElementById('tune-btn').disabled = !ms.trained || busy;
-  document.getElementById('tune-btn').textContent = ms.tuneCount > 0 ? '⚙ Tune (×' + ms.tuneCount + ')' : '⚙ Tune';
-  document.getElementById('test-btn').disabled = !ms.trained || busy;
 }
 
 function renderDeployBtns() {
@@ -372,7 +471,7 @@ function renderDeployBtns() {
   c.innerHTML = '';
   labels.forEach((lbl, i) => {
     const btn = document.createElement('button');
-    btn.className = 'model-btn' + (i === deployMdl ? ' active' : '') + (mSt[i].tested ? ' tried' : '');
+    btn.className = 'model-btn' + (i === deployMdl ? ' active' : '');
     btn.textContent = lbl;
     btn.onclick = () => { deployMdl = i; renderDeployBtns(); };
     c.appendChild(btn);
@@ -383,121 +482,92 @@ function renderDeployBtns() {
 function doTrain() {
   if (busy) return;
   busy = true;
+  clearPulse();
   setCtrlsEnabled(false);
 
-  const ms    = mSt[selModel];
-  const ratio = splitPt / TOTAL;
-  const curve = CURVES[selModel];
+  const ms       = mSt[selModel];
+  const ratio    = splitPt / TOTAL;
+  const curve    = CURVES[selModel];
+  const duration = Math.max(800, ratio * 5000);
+
+  const sweep = document.createElement('div');
+  sweep.className = 'train-sweep';
+  sweep.style.animationDuration = duration + 'ms';
+  document.getElementById('data-grid').appendChild(sweep);
+  sweep.addEventListener('animationend', () => sweep.remove(), { once: true });
 
   showProg('Training…');
-  runProg(Math.max(800, ratio * 5000), splitPt, 'Training on example', () => {
-    ms.trainAcc  = clamp(curve.base + ratio * curve.scale + curve.jitter * (Math.random() - 0.5), 0.30, 0.98);
-    ms.trained   = true;
-    ms.tuneCount = 0;
-    ms.tested    = false;
-    ms.testAcc   = null;
+  runProg(duration, splitPt, 'Training on example', () => {
+    ms.trainAcc = clamp(curve.base + ratio * curve.scale + curve.jitter * (Math.random() - 0.5), 0.30, 0.98);
+    ms.trained  = true;
+    ms.tested   = false;
+    ms.testAcc  = null;
 
     hideProg();
     document.getElementById('accuracy-panel').style.display = 'block';
     setBar('train-bar', 'train-pct', ms.trainAcc);
     document.getElementById('test-acc-row').style.display = 'none';
-    document.getElementById('tune-btn').textContent = '⚙ Tune';
     renderModelBtns();
     l2RunCnt++;
     l2Runs.unshift({ id: l2RunCnt, modelIdx: selModel, modelName: getLabels()[selModel], splitPt, trainAcc: ms.trainAcc, testAcc: null });
-    renderL2History(false);
+    renderL2History();
     Log.event('l2_train', { model: selModel, splitPt, trainAcc: ms.trainAcc });
     State.setLevel(2, { started: true });
-    updateBanner();
-    setCtrlsEnabled(true);
+    if (!splitLocked) lockSplit();
     busy = false;
+    setCtrlsEnabled(true);
+    doCheckTest();
   });
 }
 
-// ── Tune ──────────────────────────────────────────────────────────────────────
-function doTune() {
-  if (busy || !mSt[selModel].trained) return;
-  busy = true;
-  setCtrlsEnabled(false);
-
-  const ms    = mSt[selModel];
-  const ratio = splitPt / TOTAL;
-
-  showProg('Tuning hyperparameters…');
-  runProg(Math.max(500, ratio * 2000), splitPt, 'Optimizing step', () => {
-    ms.tuneCount++;
-    // Diminishing train gains with each tune round
-    const boost = 0.015 * Math.exp(-ms.tuneCount * 0.25) + 0.005 * Math.random();
-    ms.trainAcc = clamp(ms.trainAcc + boost, 0.30, 0.995);
-    ms.tested   = false;
-    ms.testAcc  = null;
-
-    hideProg();
-    setBar('train-bar', 'train-pct', ms.trainAcc);
-    document.getElementById('test-acc-row').style.display = 'none';
-    document.getElementById('tune-btn').textContent = '⚙ Tune (×' + ms.tuneCount + ')';
-    Log.event('l2_tune', { model: selModel, tuneCount: ms.tuneCount, trainAcc: ms.trainAcc });
-    updateBanner();
-    setCtrlsEnabled(true);
-    busy = false;
-  });
-}
-
-// ── Check Test ────────────────────────────────────────────────────────────────
+// ── Check Test (auto-runs after each train) ───────────────────────────────────
 function doCheckTest() {
   if (busy || !mSt[selModel].trained) return;
+  clearPulse();
 
   const ms    = mSt[selModel];
   const curve = CURVES[selModel];
   const testR = 1 - splitPt / TOTAL;
-  // Parabola: gap is smallest around tune 2, grows before and after
-  // (early tuning finds better hyperparams; late tuning overfits to train quirks)
-  const peakTune = 2;
-  const tuneFactor = Math.max(0.35, 0.35 + Math.pow(ms.tuneCount - peakTune, 2) * 0.10);
-  const gap = curve.overfit * tuneFactor * (1 + testR * 0.6);
+  const gap   = curve.overfit * (1 + testR * 0.6);
 
-  ms.testAcc = clamp(ms.trainAcc - gap + 0.02 * (Math.random() - 0.5), 0.25, 0.96);
+  const testSize = TOTAL - splitPt;
+  const rawAcc   = clamp(ms.trainAcc - gap + 0.02 * (Math.random() - 0.5), 0.25, 0.96);
+  ms.testAcc = Math.round(rawAcc * testSize) / testSize;
   ms.tested  = true;
   peekCount++;
-  State.setLevel(2, { testPeekCount: peekCount });
 
   document.getElementById('test-acc-row').style.display = 'flex';
   setBar('test-bar', 'test-pct', ms.testAcc);
-  renderPeek();
 
-  // Update history: find/update this model's latest run entry
+  // Update history
   const curRun = l2Runs.find(r => r.modelIdx === selModel);
   if (curRun) curRun.testAcc = ms.testAcc;
-  const prevBests = l2Runs.filter(r => r !== curRun && r.testAcc !== null).map(r => r.testAcc);
-  renderL2History(prevBests.length > 0 && ms.testAcc > Math.max(...prevBests));
+  renderL2History();
 
+  const testedCount = mSt.filter(m => m.tested).length;
   const deployEl = document.getElementById('deploy-section');
-  if (deployEl.style.display === 'none') {
+  if (testedCount >= 3 && deployEl.style.display === 'none') {
     deployMdl = selModel;
     deployEl.style.display = 'block';
     renderDeployBtns();
     deployEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  } else {
+    setPulse('deploy-btn');
+  } else if (deployEl.style.display !== 'none') {
     renderDeployBtns();
+    if (!deployed) setPulse('deploy-btn');
+  } else {
+    setPulse('train-btn');
   }
 
   Log.event('l2_check_test', { model: selModel, peekCount, testAcc: ms.testAcc });
   updateBanner();
 }
 
-// ── Peek counter ──────────────────────────────────────────────────────────────
-function renderPeek() {
-  const el = document.getElementById('peek-counter');
-  el.style.display = 'block';
-  document.getElementById('peek-num').textContent = peekCount;
-  document.getElementById('peek-s').textContent   = peekCount === 1 ? '' : 's';
-  el.className = peekCount >= 4 ? 'peek-danger' : peekCount >= 2 ? 'peek-warn' : '';
-}
-
 // ── Deploy ────────────────────────────────────────────────────────────────────
 function doDeploy() {
   if (busy || deployed) return;
   busy = true;
+  clearPulse();
   document.getElementById('deploy-btn').disabled = true;
   document.getElementById('deploy-btn').textContent = 'Deploying…';
 
@@ -507,8 +577,11 @@ function doDeploy() {
                  : ms.trained ? clamp(ms.trainAcc - curve.overfit, 0.25, 0.95)
                  : 0.50;
 
-  const contamination = Math.max(0, peekCount - 1) * 0.028;
-  const realAcc = clamp(baseTest - contamination + 0.015 * (Math.random() - 0.5), 0.25, 0.95);
+  // Smaller test set → less reliable estimate → larger gap between test score and reality
+  const testSize      = TOTAL - splitPt;
+  const unreliability = 1 - Math.sqrt(testSize / TOTAL);
+  const gap           = unreliability * (0.07 + 0.09 * Math.random());
+  const realAcc       = clamp(baseTest - gap, 0.25, 0.95);
 
   const streamEl = document.getElementById('deploy-stream');
   streamEl.style.display = 'grid';
@@ -524,7 +597,7 @@ function doDeploy() {
   const tick = setInterval(() => {
     if (i === 30) {
       clearInterval(tick);
-      finalizeDeploy(baseTest, correct / 30, contamination);
+      finalizeDeploy(baseTest, correct / 30);
       return;
     }
     const hit = Math.random() < realAcc;
@@ -534,7 +607,13 @@ function doDeploy() {
   }, 110);
 }
 
-function finalizeDeploy(testEst, realAcc, contamination) {
+function finalizeDeploy(testEst, realAcc) {
+  if (!round1) {
+    round1 = { splitPt, trainPct: splitPt / TOTAL, testEst, realAcc };
+  } else if (isRound2 && !round2) {
+    round2 = { splitPt, trainPct: splitPt / TOTAL, testEst, realAcc };
+  }
+
   document.getElementById('deploy-compare').style.display = 'grid';
   document.getElementById('cmp-test').textContent = fmtPct(testEst);
   document.getElementById('cmp-real').textContent = fmtPct(realAcc);
@@ -544,89 +623,220 @@ function finalizeDeploy(testEst, realAcc, contamination) {
   const msg = document.getElementById('outcome-msg');
   msg.style.display = 'block';
 
-  if (peekCount <= 1) {
+  if (Math.abs(gap) <= 3) {
     msg.className = 'outcome-msg msg-ok';
-    msg.innerHTML = `✅ <strong>Clean estimate.</strong> You checked the test set ${peekCount === 0 ? 'zero' : 'just once'}, so it remained a fair benchmark. Notice how close the real-world result is to your test accuracy.`;
-  } else if (gap <= 2) {
-    msg.className = 'outcome-msg msg-ok';
-    msg.innerHTML = `⚠️ <strong>You got lucky.</strong> You peeked ${peekCount} times — which typically inflates your test accuracy estimate — but the noise happened to go your way. Try again after even more peeks to see the gap grow.`;
+    msg.innerHTML = `✅ <strong>Close match.</strong> Your test estimate was a reliable guide — real-world performance landed right where you predicted.`;
   } else {
     msg.className = 'outcome-msg msg-bad';
-    msg.innerHTML = `🔴 <strong>Contamination gap: ${gap}%.</strong> You peeked at the test set ${peekCount} time${peekCount > 1 ? 's' : ''}. Each time, the results influenced a decision — which model to pick, whether to tune more, where to draw the split. The test set absorbed those choices and could no longer give you an unbiased estimate of real-world performance.`;
+    msg.innerHTML = `⚠️ <strong>${gap > 0 ? gap + '% gap' : 'Overestimate'}.</strong> Your test estimate and real-world performance diverged. Test scores are based on a small held-out sample — a useful guide, but not a guarantee.`;
   }
 
   State.setLevel(2, { completed: true, bestAccuracy: realAcc });
-  Log.event('l2_deploy', { deployMdl, peekCount, testEst, realAcc, contamination });
+  Log.event('l2_deploy', { deployMdl, peekCount, testEst, realAcc });
 
   deployed = true;
   busy = false;
   updateBanner();
 
   setTimeout(() => {
-    document.getElementById('checkin-section').style.display = 'block';
-    document.getElementById('next-section').style.display = 'block';
-    document.getElementById('checkin-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const nextEl = document.getElementById('next-section');
+    if (!isRound2) {
+      nextEl.innerHTML = `
+        <p style="color:var(--muted);font-size:0.9rem;line-height:1.6;max-width:500px;margin:0 auto 18px;">
+          Nice work. Before moving on, try running the level again with a <strong>different train/test split</strong> — see what changes.
+        </p>
+        <button class="btn btn-next-stage" id="next-stage-btn" onclick="startRound2()">↩ Try a different split</button>`;
+    } else {
+      showComparison();
+      nextEl.innerHTML = `
+        <p style="color:var(--muted);font-size:0.9rem;line-height:1.6;max-width:500px;margin:0 auto 18px;">
+          Take a look at your two runs above, then continue to reflect on what they tell you.
+        </p>
+        <button class="btn btn-next-stage" id="next-stage-btn" onclick="goNextStage()">Continue →</button>
+        <div style="margin-top:12px;">
+          <button class="btn btn-secondary" onclick="startRound2()">↩ Try yet another split</button>
+        </div>`;
+    }
+    nextEl.style.display = 'block';
+    nextEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    setPulse('next-stage-btn');
   }, 700);
 }
 
-// ── Check-in ──────────────────────────────────────────────────────────────────
-function selectCheckin(btn, val) {
-  checkinVal = val;
-  document.querySelectorAll('.ci-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-}
-
-function submitCheckin() {
-  const txt = document.getElementById('ci-text').value.trim();
-  if (checkinVal || txt) Log.event('l2_checkin', { rating: checkinVal, feedback: txt });
-  document.getElementById('checkin-section').style.display = 'none';
-  document.getElementById('next-section').scrollIntoView({ behavior: 'smooth' });
+// ── Round comparison ──────────────────────────────────────────────────────────
+function showComparison() {
+  function makeCard(r, label) {
+    const trainPct = Math.round(r.trainPct * 100);
+    const testPct  = 100 - trainPct;
+    const gap      = Math.round((r.testEst - r.realAcc) * 100);
+    return `
+      <div class="cmp-label" style="margin-bottom:10px;">${label}</div>
+      <div style="font-size:1.5rem;font-weight:800;margin-bottom:8px;">${trainPct}% train / ${testPct}% test</div>
+      <div style="display:flex;flex-direction:column;gap:6px;font-size:0.85rem;">
+        <div style="display:flex;justify-content:space-between;">
+          <span style="color:var(--muted);">Test accuracy</span>
+          <span style="font-weight:700;color:var(--test);">${fmtPct(r.testEst)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span style="color:var(--muted);">Real-world</span>
+          <span style="font-weight:700;color:${r.realAcc >= r.testEst - 0.05 ? 'var(--train)' : 'var(--test)'};">${fmtPct(r.realAcc)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:6px;margin-top:2px;">
+          <span style="color:var(--muted);">Gap</span>
+          <span style="font-weight:700;">${gap > 0 ? '+' : ''}${gap}%</span>
+        </div>
+      </div>`;
+  }
+  document.getElementById('cmp-r1').innerHTML = makeCard(round1, 'Round 1');
+  document.getElementById('cmp-r2').innerHTML = makeCard(round2, 'Round 2');
+  document.getElementById('comparison-section').style.display = 'block';
 }
 
 // ── Next stage ────────────────────────────────────────────────────────────────
 function goNextStage() {
-  Log.event('l2_complete', { peekCount });
-  window.location.href = 'level3.html';
+  Log.event('l2_complete', { peekCount, round1, round2 });
+  window.location.href = 'interstitial2.html';
+}
+
+function startRound2() {
+  const savedRound1 = round1;
+  startOver();                    // resets everything, unlocks slider
+  round1        = savedRound1;
+  isRound2      = true;
+  originalSplit = savedRound1.splitPt;
+  // Gate train until slider moves enough
+  document.getElementById('train-btn').disabled = true;
+  updateRound2Hint();
+  updateBanner();
+  setPulse('split-slider');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function checkRound2Gate() {
+  const delta    = Math.abs(splitPt - originalSplit);
+  const trainBtn = document.getElementById('train-btn');
+  trainBtn.disabled = delta < ROUND2_DELTA;
+  updateRound2Hint();
+  updateBanner();
+}
+
+function updateRound2Hint() {
+  if (!isRound2 || splitLocked) return;
+  const delta  = Math.abs(splitPt - originalSplit);
+  const needed = ROUND2_DELTA - delta;
+  const hint   = document.querySelector('.split-hint');
+  if (delta >= ROUND2_DELTA) {
+    hint.innerHTML = '✓ Far enough from round 1 — training unlocked <button class="info-btn" onclick="showTooltip(this,event)" data-tip="split">i</button>';
+  } else {
+    hint.innerHTML = `Move ${needed} more position${needed === 1 ? '' : 's'} from your round 1 split to unlock training <button class="info-btn" onclick="showTooltip(this,event)" data-tip="split">i</button>`;
+  }
 }
 
 // ── Theme / model pickers ─────────────────────────────────────────────────────
-function showThemePicker() { document.getElementById('theme-overlay').style.display = 'flex'; }
 function pickTheme(name) {
   State.set('theme', name);
   Themes.apply(name);
   document.getElementById('theme-overlay').style.display = 'none';
 }
 
-function showModelPicker() { document.getElementById('model-overlay').style.display = 'flex'; }
 function pickModelSet(name) {
   State.set('modelSet', name);
-  document.getElementById('models-btn').style.display = '';
+  document.getElementById('menu-models').style.display = '';
   document.getElementById('model-overlay').style.display = 'none';
   renderModelBtns();
   if (document.getElementById('deploy-section').style.display !== 'none') renderDeployBtns();
 }
 
+// ── Hamburger menu ────────────────────────────────────────────────────────────
+function toggleMenu() {
+  document.getElementById('menu-dropdown').classList.toggle('open');
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#menu-btn') && !e.target.closest('#menu-dropdown')) {
+    document.getElementById('menu-dropdown').classList.remove('open');
+  }
+});
+
+function menuAction(action) {
+  document.getElementById('menu-dropdown').classList.remove('open');
+  if (action === 'theme')  document.getElementById('theme-overlay').style.display = 'flex';
+  if (action === 'models') document.getElementById('model-overlay').style.display = 'flex';
+  if (action === 'reset')  confirmStartOver();
+  if (action === 'restart-game') {
+    if (confirm('Go back to Level 1 and start the whole game over?')) {
+      window.location.href = 'index.html';
+    }
+  }
+}
+
+// ── Split lock ────────────────────────────────────────────────────────────────
+function lockSplit() {
+  splitLocked = true;
+  const slider = document.getElementById('split-slider');
+  slider.disabled = true;
+  slider.style.opacity = '0.45';
+  const hint = document.querySelector('.split-hint');
+  hint.innerHTML = '🔒 Split locked <button class="info-btn" onclick="showTooltip(this,event)" data-tip="split-locked" style="margin-left:4px;">i</button>';
+}
+
+function unlockSplit() {
+  splitLocked = false;
+  const slider = document.getElementById('split-slider');
+  slider.disabled = false;
+  slider.style.opacity = '';
+  const hint = document.querySelector('.split-hint');
+  hint.innerHTML = 'Drag to adjust the train / test split <button class="info-btn" onclick="showTooltip(this,event)" data-tip="split">i</button>';
+}
+
 // ── Guide banner ──────────────────────────────────────────────────────────────
+function setPulse(id) {
+  if (_pulseEl) { _pulseEl.classList.remove('next-pulse'); _pulseEl = null; }
+  if (id) { _pulseEl = document.getElementById(id); if (_pulseEl) _pulseEl.classList.add('next-pulse'); }
+}
+function clearPulse() { setPulse(null); }
+
+function showHint() {
+  const banner = document.getElementById('guide-banner');
+  banner.style.display = 'flex';
+  document.getElementById('hint-btn').style.display = 'none';
+  setTimeout(() => banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+}
+
 function updateBanner() {
-  const el          = document.getElementById('guide-banner');
-  const anyTrained  = mSt.some(m => m.trained);
+  const banner      = document.getElementById('guide-banner');
+  const emojiEl     = document.getElementById('guide-emoji');
+  const textEl      = document.getElementById('guide-text');
   const anyTested   = mSt.some(m => m.tested);
-  const curTunes    = mSt[selModel].tuneCount;
-  const highTune    = mSt[selModel].trained && curTunes >= 4;
+
+  let emoji, html;
 
   if (deployed) {
-    el.innerHTML = `🎓 <strong>Level 2 complete.</strong> You experienced how peeking at test results — even lightly — contaminates your accuracy estimate. Scroll down to head to Level 3.`;
+    emoji = '🎓'; html = `<strong>Level 2 complete.</strong> Scroll down to continue to Level 3.`;
   } else if (peekCount >= 3) {
-    el.innerHTML = `⚠️ <strong>You've peeked ${peekCount} times.</strong> Each peek let test results influence a decision. When you deploy, watch how much that shows up in the real-world result.`;
-  } else if (highTune) {
-    el.innerHTML = `🔴 <strong>Tuned ${curTunes} times.</strong> Train accuracy keeps climbing — but at some point, excessive tuning causes the model to memorize training quirks rather than learn real patterns. Check your test accuracy to see the effect.`;
+    emoji = '👁'; html = `<strong>${peekCount} test checks so far.</strong> Keep exploring, or deploy when you feel ready.`;
   } else if (anyTested) {
-    el.innerHTML = `👁 <strong>Test set checked.</strong> You can keep tuning (a couple rounds often helps), switch models, or adjust the split — but every peek counts. Deploy when you're ready.`;
-  } else if (anyTrained) {
-    el.innerHTML = `✅ <strong>Model trained.</strong> Click <strong>Check Test</strong> to see how it does on held-out data — or try tuning it first. A round or two of tuning often improves test accuracy too.`;
+    const tc = mSt.filter(m => m.tested).length;
+    if (tc >= 3) {
+      emoji = '👁'; html = `<strong>${tc} models tested.</strong> Choose your best and deploy — or keep exploring.`;
+    } else {
+      emoji = '👁'; html = `<strong>${tc} model${tc > 1 ? 's' : ''} tested.</strong> Try the others to see how they compare on held-out data.`;
+    }
+  } else if (isRound2 && originalSplit !== null) {
+    const delta = Math.abs(splitPt - originalSplit);
+    if (delta >= ROUND2_DELTA) {
+      emoji = '✂️'; html = `<strong>Split moved far enough.</strong> Pick a model and train — let's see how this compares to round 1.`;
+    } else {
+      emoji = '✂️'; html = `<strong>Round 2.</strong> Your round 1 split was ${originalSplit} train / ${TOTAL - originalSplit} test. Drag the slider at least 15% in either direction to unlock training.`;
+    }
   } else {
-    el.innerHTML = `✂️ <strong>Now you can split your data.</strong> Drag the slider to decide where training ends and the test set begins. Train a model, then check how it does on held-out data — but pay attention to how many times you peek!`;
+    emoji = '✂️'; html = `<strong>Now you can split your data.</strong> Drag the slider to choose how much to hold back, then pick a model and train.`;
   }
+
+  emojiEl.textContent = emoji;
+  textEl.innerHTML    = html;
+  banner.style.display = 'flex';
+  document.getElementById('hint-btn').style.display = 'none';
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -639,10 +849,7 @@ function setBar(barId, pctId, val) {
 }
 
 function setCtrlsEnabled(on) {
-  const ms = mSt[selModel];
   document.getElementById('train-btn').disabled = !on;
-  document.getElementById('tune-btn').disabled  = !on || !ms.trained;
-  document.getElementById('test-btn').disabled  = !on || !ms.trained;
 }
 
 function showProg(label) {
@@ -674,99 +881,68 @@ function runProg(duration, total, verb, onDone) {
 }
 
 // ── Run history ───────────────────────────────────────────────────────────────
-function getL2Score(run) {
-  // Tested runs rank by test acc; untested runs rank lower
-  return run.testAcc !== null ? run.testAcc : run.trainAcc * 0.88;
-}
-
-function renderL2History(newBest) {
+function renderL2History() {
   const panel = document.getElementById('history-panel');
-  const list  = document.getElementById('history-list');
   if (l2Runs.length < 2) { panel.style.display = 'none'; return; }
   panel.style.display = 'block';
-  list.innerHTML = '';
 
-  list.appendChild(makeL2RunEntry(l2Runs[1], 'previous', false));
+  const trainList = document.getElementById('history-train');
+  trainList.innerHTML = '';
+  [...l2Runs]
+    .sort((a, b) => b.trainAcc - a.trainAcc)
+    .slice(0, 3)
+    .forEach((run, rank) => trainList.appendChild(makeHistoryEntry(run, rank + 1, 'train')));
 
-  const divider = document.createElement('div');
-  divider.style.cssText = 'font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-top:8px;margin-bottom:4px;';
-  divider.textContent = 'Top 3';
-  list.appendChild(divider);
-
-  [...l2Runs].sort((a, b) => getL2Score(b) - getL2Score(a)).slice(0, 3).forEach((run, rank) => {
-    const isRunNewBest = newBest && rank === 0 && run === l2Runs[0];
-    list.appendChild(makeL2RunEntry(run, 'top', isRunNewBest, rank + 1));
-  });
+  const testList = document.getElementById('history-test');
+  testList.innerHTML = '';
+  const testedRuns = l2Runs.filter(r => r.testAcc !== null);
+  if (testedRuns.length === 0) {
+    testList.innerHTML = '<div style="font-size:0.82rem;color:var(--muted);padding:4px 0;">No test results yet</div>';
+  } else {
+    [...testedRuns]
+      .sort((a, b) => b.testAcc - a.testAcc)
+      .slice(0, 3)
+      .forEach((run, rank) => testList.appendChild(makeHistoryEntry(run, rank + 1, 'test')));
+  }
 }
 
-function makeL2RunEntry(run, type, isNewBest, rank) {
+function makeHistoryEntry(run, rank, type) {
   const el = document.createElement('div');
-  el.className = 'run-entry' + (isNewBest ? ' new-best' : '');
+  el.className = 'run-entry';
 
   const tag = document.createElement('span');
-  tag.className = 'run-tag ' + (type === 'previous' ? 'tag-previous' : rank === 1 ? 'tag-best' : 'tag-top');
-  tag.textContent = type === 'previous' ? 'Previous' : '#' + rank;
+  tag.className = 'run-tag ' + (rank === 1 ? 'tag-best' : 'tag-top');
+  tag.textContent = '#' + rank;
   el.appendChild(tag);
-
-  const runId = document.createElement('span');
-  runId.className = 'run-id';
-  runId.textContent = 'Run ' + run.id;
-  el.appendChild(runId);
 
   const modelLbl = document.createElement('span');
   modelLbl.style.cssText = 'font-size:0.8rem;font-weight:700;color:var(--accent);';
   modelLbl.textContent = run.modelName;
   el.appendChild(modelLbl);
 
-  if (isNewBest) {
-    const star = document.createElement('span');
-    star.textContent = '★ New best!';
-    star.style.cssText = 'color:var(--train);font-weight:700;font-size:0.8rem;';
-    el.appendChild(star);
-  }
-
   const data = document.createElement('span');
   data.className = 'run-data';
-  data.textContent = run.splitPt + '/' + (TOTAL - run.splitPt) + ' split';
+  data.textContent = run.splitPt + '/' + (TOTAL - run.splitPt);
   el.appendChild(data);
 
   const right = document.createElement('div');
   right.className = 'run-right';
+  const acc   = type === 'train' ? run.trainAcc : run.testAcc;
+  const color = type === 'train' ? 'var(--train)' : 'var(--test)';
 
-  if (run.testAcc !== null) {
-    // Show "train%→" prefix then test bar + score in test colour
-    const prefix = document.createElement('span');
-    prefix.style.cssText = 'font-size:0.75rem;color:var(--muted);white-space:nowrap;';
-    prefix.textContent = Math.round(run.trainAcc * 100) + '%→';
-    right.appendChild(prefix);
+  const barBg = document.createElement('div');
+  barBg.className = 'run-mini-bar-bg';
+  const bar = document.createElement('div');
+  bar.className = 'run-mini-bar';
+  bar.style.cssText = 'width:' + Math.round(acc * 100) + '%;background:' + color + ';';
+  barBg.appendChild(bar);
+  right.appendChild(barBg);
 
-    const barBg = document.createElement('div');
-    barBg.className = 'run-mini-bar-bg';
-    const bar = document.createElement('div');
-    bar.className = 'run-mini-bar';
-    bar.style.cssText = 'width:' + Math.round(run.testAcc * 100) + '%;background:var(--test);';
-    barBg.appendChild(bar);
-    right.appendChild(barBg);
-
-    const score = document.createElement('span');
-    score.className = 'run-score';
-    score.style.color = 'var(--test)';
-    score.textContent = Math.round(run.testAcc * 100) + '%';
-    right.appendChild(score);
-  } else {
-    const barBg = document.createElement('div');
-    barBg.className = 'run-mini-bar-bg';
-    const bar = document.createElement('div');
-    bar.className = 'run-mini-bar';
-    bar.style.width = Math.round(run.trainAcc * 100) + '%';
-    barBg.appendChild(bar);
-    right.appendChild(barBg);
-
-    const score = document.createElement('span');
-    score.className = 'run-score';
-    score.textContent = Math.round(run.trainAcc * 100) + '%';
-    right.appendChild(score);
-  }
+  const score = document.createElement('span');
+  score.className = 'run-score';
+  score.style.color = color;
+  score.textContent = Math.round(acc * 100) + '%';
+  right.appendChild(score);
 
   el.appendChild(right);
   return el;
@@ -779,9 +955,13 @@ function confirmStartOver() {
 
 function startOver() {
   splitPt = 96; selModel = 0; deployMdl = 0;
-  peekCount = 0; busy = false; deployed = false; checkinVal = null;
+  peekCount = 0; busy = false; deployed = false;
+  round1 = null; round2 = null; isRound2 = false; originalSplit = null;
+  if (splitLocked) unlockSplit();
   l2Runs = []; l2RunCnt = 0;
-  mSt.forEach(m => { m.trained=false; m.tuneCount=0; m.trainAcc=null; m.testAcc=null; m.tested=false; });
+  initBlockClasses();
+  updateClassLegend();
+  mSt.forEach(m => { m.trained=false; m.trainAcc=null; m.testAcc=null; m.tested=false; });
 
   State.setLevel(2, { started: false, completed: false, testPeekCount: 0 });
   Log.event('l2_restart', {});
@@ -792,7 +972,8 @@ function startOver() {
   renderModelBtns();
 
   document.getElementById('history-panel').style.display   = 'none';
-  document.getElementById('history-list').innerHTML        = '';
+  document.getElementById('history-train').innerHTML       = '';
+  document.getElementById('history-test').innerHTML        = '';
   document.getElementById('accuracy-panel').style.display  = 'none';
   document.getElementById('test-acc-row').style.display    = 'none';
   document.getElementById('progress-panel').style.display  = 'none';
@@ -801,18 +982,16 @@ function startOver() {
   document.getElementById('deploy-stream').innerHTML       = '';
   document.getElementById('deploy-compare').style.display  = 'none';
   document.getElementById('outcome-msg').style.display     = 'none';
-  document.getElementById('checkin-section').style.display = 'none';
-  document.getElementById('next-section').style.display    = 'none';
-  document.getElementById('peek-counter').style.display    = 'none';
+  document.getElementById('next-section').style.display       = 'none';
+  document.getElementById('comparison-section').style.display = 'none';
 
   const db = document.getElementById('deploy-btn');
   db.disabled = false; db.textContent = '🚀 Deploy';
-  document.getElementById('train-btn').disabled    = false;
-  document.getElementById('tune-btn').disabled     = true;
-  document.getElementById('tune-btn').textContent  = '⚙ Tune';
-  document.getElementById('test-btn').disabled     = true;
+  document.getElementById('train-btn').disabled = false;
 
+  clearPulse();
   updateBanner();
+  setPulse('split-slider');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 </script>

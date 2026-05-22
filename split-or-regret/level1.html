@@ -3,66 +3,411 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Split or Regret — Level 1</title>
-<!-- Apply theme before paint to prevent flash -->
-<script>
-  try {
-    const s = JSON.parse(localStorage.getItem('sor_state') || '{}');
-    document.documentElement.className = 'theme-' + (s.theme || 'clean');
-  } catch(e) {}
-</script>
-<link rel="stylesheet" href="css/shared.css">
+<title>Split or Regret</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Space+Grotesk:wght@400;600;700&family=VT323&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-.deploy-dot { aspect-ratio:1; border-radius:50%; background:var(--border); transition:background 0.15s; }
-.deploy-dot.correct { background:var(--train); }
-.deploy-dot.wrong   { background:var(--test); }
-.deploy-stream { display:grid; grid-template-columns:repeat(15,1fr); gap:3px; margin:14px 0; }
-@media (max-width:480px) { .deploy-stream { grid-template-columns:repeat(10,1fr); } }
+  /* ── Theme variables ── */
+  .theme-clean {
+    --bg: #f5f7fa; --surface: #ffffff; --border: #dde1e7;
+    --text: #1a1a2e; --muted: #6b7280; --accent: #3b82f6;
+    --train: #10b981; --block-default: #93c5fd; --block-selected: #1d4ed8;
+    --font: 'Inter', system-ui, sans-serif; --radius: 8px;
+    --sweep-color: rgba(16, 185, 129, 0.28);   /* matches --train */
+    --pulse-ring:  rgba(59, 130, 246, 0.55);   /* matches --accent */
+  }
+  .theme-dark {
+    --bg: #0f1117; --surface: #1e2130; --border: #2e3347;
+    --text: #e2e8f0; --muted: #64748b; --accent: #818cf8;
+    --train: #34d399; --block-default: #334155; --block-selected: #6366f1;
+    --font: 'Space Grotesk', system-ui, sans-serif; --radius: 8px;
+    --sweep-color: rgba(52, 211, 153, 0.28);   /* matches --train */
+    --pulse-ring:  rgba(129, 140, 248, 0.55);  /* matches --accent */
+  }
+  .theme-retro {
+    --bg: #0d0d0d; --surface: #111111; --border: #1a3d1a;
+    --text: #00ff41; --muted: #00a82b; --accent: #00ff41;
+    --train: #00ff41; --block-default: #0a2b0a; --block-selected: #00cc33;
+    --font: 'VT323', 'Courier New', monospace; --radius: 0px;
+    --sweep-color: rgba(0, 255, 65, 0.28);     /* matches --train */
+    --pulse-ring:  rgba(0, 255, 65, 0.55);     /* matches --accent */
+  }
+  .theme-candy {
+    --bg: #fdf4ff; --surface: #ffffff; --border: #e9d5ff;
+    --text: #3b0764; --muted: #a78bfa; --accent: #c026d3;
+    --train: #ec4899; --block-default: #f5d0fe; --block-selected: #a21caf;
+    --font: 'Nunito', system-ui, sans-serif; --radius: 16px;
+    --sweep-color: rgba(236, 72, 153, 0.25);   /* matches --train */
+    --pulse-ring:  rgba(192, 38, 211, 0.55);   /* matches --accent */
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    min-height: 100vh; transition: background 0.3s, color 0.3s;
+  }
+
+  /* ── Theme picker overlay ── */
+  #theme-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: flex; align-items: center; justify-content: center; z-index: 100;
+  }
+  .theme-card {
+    background: white; border-radius: 12px; padding: 36px 40px;
+    max-width: 480px; width: 90%; text-align: center;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  .theme-card h1 { font-size: 1.6rem; margin-bottom: 6px; color: #1a1a2e; }
+  .theme-card p { color: #6b7280; margin-bottom: 24px; font-size: 0.95rem; }
+  .theme-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .theme-btn {
+    padding: 14px 12px; border: 2px solid #e5e7eb; border-radius: 8px;
+    cursor: pointer; font-size: 0.9rem; font-weight: 600; background: white;
+    transition: border-color 0.2s, transform 0.1s;
+  }
+  .theme-btn:hover { border-color: #3b82f6; transform: translateY(-1px); }
+  .theme-btn .swatch { height: 28px; border-radius: 4px; margin-bottom: 8px; }
+  .swatch-clean  { background: linear-gradient(135deg, #f5f7fa, #3b82f6); }
+  .swatch-dark   { background: linear-gradient(135deg, #0f1117, #6366f1); }
+  .swatch-retro  { background: linear-gradient(135deg, #0d0d0d, #00ff41); }
+  .swatch-candy  { background: linear-gradient(135deg, #fdf4ff, #c026d3); }
+
+  /* ── Main layout ── */
+  #app { display: none; flex-direction: column; min-height: 100vh; }
+
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 12px 24px; display: flex; align-items: center; justify-content: space-between;
+  }
+  header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.02em; }
+  .level-badge {
+    background: var(--accent); color: white; font-size: 0.75rem;
+    padding: 3px 10px; border-radius: 20px; font-weight: 600; margin-left: 10px;
+  }
+  #menu-btn {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    cursor: pointer; padding: 6px 10px; border-radius: var(--radius); font-size: 1rem;
+    line-height: 1;
+  }
+  #menu-btn:hover { color: var(--text); border-color: var(--accent); }
+  #menu-dropdown {
+    display: none; position: absolute; right: 0; top: calc(100% + 6px);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); min-width: 160px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15); z-index: 50; overflow: hidden;
+  }
+  #menu-dropdown.open { display: block; }
+  .menu-item {
+    display: block; width: 100%; text-align: left; background: none; border: none;
+    padding: 10px 16px; font-family: var(--font); font-size: 0.9rem;
+    color: var(--text); cursor: pointer;
+  }
+  .menu-item:hover { background: var(--bg); }
+  .menu-item.danger { color: #ef4444; }
+  .menu-divider { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+
+  main { flex: 1; padding: 24px; max-width: 960px; margin: 0 auto; width: 100%; }
+
+  .section-label {
+    font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--muted); margin-bottom: 10px;
+  }
+
+  /* ── Data grid ── */
+  /* ── Ambient pool ── */
+  #pool-zone {
+    position: relative;
+    margin-bottom: 20px;
+    overflow: visible;
+  }
+  .pool-block {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0.22;
+    will-change: transform;
+    border-radius: calc(var(--radius) / 3);
+    overflow: hidden;
+    color: var(--block-selected);
+    animation: pool-drift var(--pd, 12s) var(--delay, 0s) ease-in-out infinite alternate;
+    transition: opacity 1.4s ease;
+  }
+  @keyframes pool-drift {
+    from { transform: translate(0, 0); }
+    to   { transform: translate(var(--dx, 3px), var(--dy, -3px)); }
+  }
+  #pool-zone.pool-paused .pool-block { animation-play-state: paused; }
+  #grid-container {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+    position: relative; z-index: 1;
+  }
+  #data-grid {
+    display: grid;
+    grid-template-columns: repeat(20, 1fr);
+    gap: 4px;
+    user-select: none;
+    position: relative;
+  }
+  .train-sweep {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 22%;
+    background: linear-gradient(90deg, transparent, var(--sweep-color) 50%, transparent);
+    pointer-events: none;
+    z-index: 2;
+    animation: train-sweep-anim ease-in-out forwards;
+  }
+  @keyframes train-sweep-anim {
+    from { left: -22%; }
+    to   { left: 105%; }
+  }
+
+  /* ── Next-action pulse ring ── */
+  .next-pulse { position: relative; overflow: visible; }
+  .next-pulse::after {
+    content: ''; position: absolute; inset: -5px; pointer-events: none;
+    border-radius: calc(var(--radius) + 4px);
+    border: 2px solid var(--pulse-ring);
+    opacity: 0;
+    animation: pulse-ring 1.6s ease-out infinite;
+    z-index: 10;
+  }
+  @keyframes pulse-ring {
+    0%   { opacity: 0.8; transform: scale(1.00); }
+    100% { opacity: 0;   transform: scale(1.16); }
+  }
+  .btn-next-stage:disabled { opacity: 0.45; cursor: default; }
+  /* ── Info tooltip ── */
+  .info-btn {
+    width: 16px; height: 16px; border-radius: 50%;
+    border: 1px solid var(--muted); background: none; color: var(--muted);
+    font-size: 0.62rem; font-weight: 700; font-style: italic;
+    font-family: Georgia, serif;
+    line-height: 1; cursor: pointer; padding: 0; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    vertical-align: middle; transition: color 0.15s, border-color 0.15s;
+  }
+  .info-btn:hover { color: var(--text); border-color: var(--text); }
+  #tooltip {
+    display: none; position: fixed; z-index: 400;
+    max-width: 260px; width: max-content;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 14px;
+    font-size: 0.82rem; line-height: 1.5; color: var(--text);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+  }
+
+  .block {
+    aspect-ratio: 1; border-radius: calc(var(--radius) / 3);
+    color: var(--block-default); cursor: default;
+    transition: color 0.15s, transform 0.1s;
+    border: 1px solid transparent;
+    overflow: hidden;
+  }
+  .block:hover { transform: scale(1.15); }
+  .btn-collect:disabled { cursor: default; }
+  .block.selected { color: var(--block-selected); }
+  .block svg, .pool-block svg { display: block; width: 100%; height: 100%; }
+  .block svg .block-fill, .pool-block svg .block-fill { fill: currentColor; }
+  .block svg .block-hole, .pool-block svg .block-hole { fill: var(--surface); }
+
+  /* ── Controls ── */
+  #controls {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 20px;
+  }
+  .btn {
+    padding: 10px 22px; border: none; border-radius: var(--radius);
+    font-family: var(--font); font-size: 0.9rem; font-weight: 700;
+    cursor: pointer; transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn:hover { opacity: 0.85; transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn-train   { background: var(--train);  color: white; }
+  .btn-collect {
+    background: var(--accent); color: white;
+    user-select: none; -webkit-user-select: none;
+  }
+  .btn-collect:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .count-label { color: var(--muted); font-size: 0.85rem; }
+
+  /* ── Flying data points ── */
+  .block-flyer {
+    position: fixed; pointer-events: none; z-index: 50;
+    border-radius: calc(var(--radius) / 3); overflow: hidden;
+  }
+  @keyframes block-settle {
+    0%   { transform: scale(1.45); }
+    55%  { transform: scale(0.88); }
+    100% { transform: scale(1); }
+  }
+  .block.settling { animation: block-settle 0.28s ease-out forwards; }
+
+  /* ── Accuracy display ── */
+  #accuracy-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 20px; margin-top: 20px;
+    display: none;
+  }
+  .accuracy-row { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+  .accuracy-label { font-size: 0.85rem; width: 120px; color: var(--muted); }
+  .accuracy-bar-bg {
+    flex: 1; height: 12px; background: var(--border);
+    border-radius: 6px; overflow: hidden;
+  }
+  .accuracy-bar { height: 100%; background: var(--train); border-radius: 6px; transition: width 0.6s ease; }
+  .accuracy-pct { font-size: 0.85rem; font-weight: 700; width: 42px; text-align: right; }
+
+  .run-entry {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: calc(var(--radius) / 1.5);
+    font-size: 0.85rem; border: 1px solid var(--border); background: var(--bg);
+  }
+  .run-entry.new-best {
+    border-color: var(--train); background: color-mix(in srgb, var(--train) 10%, var(--bg));
+  }
+  .run-tag {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 2px 7px; border-radius: 10px; white-space: nowrap;
+  }
+  .tag-best { background: var(--train);   color: white; }
+  .tag-top  { background: var(--accent);  color: white; }
+  .run-id   { color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
+  .run-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .run-mini-bar-bg { width: 80px; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .run-mini-bar  { height: 100%; background: var(--accent); border-radius: 4px; }
+  .run-score { font-weight: 700; width: 36px; text-align: right; }
+  .run-data  { color: var(--muted); }
+
+  .model-btn {
+    padding: 7px 16px; border: 2px solid var(--border); border-radius: var(--radius);
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.15s;
+    position: relative;
+  }
+  .model-btn:hover { border-color: var(--accent); }
+  .model-btn.active { border-color: var(--accent); background: var(--accent); color: white; }
+  .model-btn.tried::after {
+    content: '✓'; position: absolute; top: -5px; right: -5px;
+    background: var(--train); color: white; border-radius: 50%;
+    width: 16px; height: 16px; font-size: 10px; line-height: 16px; text-align: center;
+  }
+  .btn-next-stage {
+    background: var(--accent); color: white; font-size: 1rem; padding: 13px 32px;
+    animation: pulse-glow 2s infinite;
+  }
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.35); }
+    50%       { box-shadow: 0 0 0 10px rgba(255,255,255,0); }
+  }
+
+  /* ── Deploy zone ── */
+  #deploy-grid {
+    display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin-top: 10px;
+  }
+  .deploy-slot {
+    aspect-ratio: 1; border: 1px dashed var(--border);
+    border-radius: calc(var(--radius) / 3); background: var(--bg);
+  }
+  .deploy-block.correct   { color: #22c55e; }
+  .deploy-block.incorrect { color: #ef4444; }
+  @keyframes float-miss {
+    0%   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-22px); }
+  }
+  .miss-label {
+    position: fixed; pointer-events: none; z-index: 60;
+    font-size: 0.68rem; font-weight: 800; color: #ef4444;
+    letter-spacing: 0.04em; white-space: nowrap;
+    animation: float-miss 0.65s ease-out forwards;
+  }
+
+  #intro-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.72);
+    display: flex; align-items: center; justify-content: center; z-index: 110;
+  }
+  #intro-card {
+    background: white; border-radius: 14px; padding: 40px 44px;
+    max-width: 540px; width: 92%;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  #intro-card h2 {
+    font-size: 1.5rem; font-weight: 800; color: #1a1a2e; margin-bottom: 20px;
+  }
+  #intro-card p {
+    color: #374151; font-size: 0.97rem; line-height: 1.7; margin-bottom: 16px;
+  }
+  #intro-card p:last-of-type { margin-bottom: 28px; }
+  #intro-go {
+    display: block; width: 100%; padding: 13px; background: #3b82f6; color: white;
+    border: none; border-radius: 8px; font-size: 1rem; font-weight: 700;
+    cursor: pointer; transition: opacity 0.2s;
+  }
+  #intro-go:hover { opacity: 0.88; }
 </style>
 </head>
-<body>
+<body class="theme-clean">
 
-<!-- Theme picker overlay -->
-<div id="theme-overlay" class="overlay" style="display:none;">
-  <div class="picker-card">
-    <h1>Change Theme</h1>
-    <p>Pick a different vibe</p>
-    <div class="picker-options">
-      <button class="picker-btn" onclick="changeTheme('clean')">
-        <div class="swatch swatch-clean"></div>Clean
+<!-- Intro card -->
+<div id="intro-overlay">
+  <div id="intro-card">
+    <h2>Split or Regret</h2>
+    <p>You're building a model that will make real decisions — maybe flagging fraudulent transactions, recommending content, or diagnosing medical images. Your job is to train it on the data you have collected and labeled.</p>
+    <p>The hard part: you won't know if it actually works until it's already out in the world, making decisions on examples it has never seen before.</p>
+    <p><strong>Your goal:</strong> collect data, train a model, and deploy it. Then see what happens.</p>
+    <button id="intro-go" onclick="dismissIntro()">Let's go</button>
+  </div>
+</div>
+
+<!-- Theme picker -->
+<div id="theme-overlay">
+  <div class="theme-card">
+    <h1>Split or Regret</h1>
+    <p>Pick a vibe to get started</p>
+    <div class="theme-options">
+      <button class="theme-btn" onclick="pickTheme('clean')">
+        <div class="swatch swatch-clean"></div>
+        <span style="font-family:'Inter',system-ui,sans-serif;">Clean</span>
       </button>
-      <button class="picker-btn" onclick="changeTheme('dark')">
-        <div class="swatch swatch-dark"></div>Dark
+      <button class="theme-btn" onclick="pickTheme('dark')">
+        <div class="swatch swatch-dark"></div>
+        <span style="font-family:'Space Grotesk',system-ui,sans-serif;">Dark</span>
       </button>
-      <button class="picker-btn" onclick="changeTheme('retro')">
-        <div class="swatch swatch-retro"></div>Retro Terminal
+      <button class="theme-btn" onclick="pickTheme('retro')">
+        <div class="swatch swatch-retro"></div>
+        <span style="font-family:'VT323','Courier New',monospace;font-size:1.15rem;letter-spacing:0.05em;">Retro Terminal</span>
       </button>
-      <button class="picker-btn" onclick="changeTheme('candy')">
-        <div class="swatch swatch-candy"></div>Candy
+      <button class="theme-btn" onclick="pickTheme('candy')">
+        <div class="swatch swatch-candy"></div>
+        <span style="font-family:'Nunito',system-ui,sans-serif;font-weight:700;">Candy</span>
       </button>
     </div>
   </div>
 </div>
 
-<!-- Model set picker overlay -->
-<div id="modelset-overlay" class="overlay" style="display:none;">
-  <div class="picker-card">
-    <h1 id="modelset-title">Choose Your Models</h1>
-    <p id="modelset-desc">Pick a naming style for the 6 models you'll train. You can change this anytime.</p>
-    <div class="picker-options">
-      <button class="picker-btn" onclick="pickModelSet('greek')">
+
+<!-- Model set picker -->
+<div id="modelset-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:100;">
+  <div class="theme-card">
+    <h1>Choose Your Models</h1>
+    <p>Pick a naming style for the 6 models you'll train. You can change this anytime.</p>
+    <div class="theme-options">
+      <button class="theme-btn" onclick="pickModelSet('greek')">
         <div style="font-size:1.3rem;letter-spacing:0.1em;margin-bottom:6px;">α β γ δ ε ζ</div>
         Greek Letters
       </button>
-      <button class="picker-btn" onclick="pickModelSet('animals')">
+      <button class="theme-btn" onclick="pickModelSet('animals')">
         <div style="font-size:1.3rem;margin-bottom:6px;">🦊 🐺 🐻 🦅 🦈 🐯</div>
         Animals
       </button>
-      <button class="picker-btn" onclick="pickModelSet('zodiac')">
+      <button class="theme-btn" onclick="pickModelSet('zodiac')">
         <div style="font-size:1.3rem;letter-spacing:0.05em;margin-bottom:6px;">♈ ♉ ♊ ♋ ♌ ♍</div>
         Zodiac
       </button>
-      <button class="picker-btn" onclick="pickModelSet('realistic')">
+      <button class="theme-btn" onclick="pickModelSet('realistic')">
         <div style="font-size:0.72rem;letter-spacing:0.04em;margin-bottom:8px;font-weight:700;color:#6b7280;">SVM · RandForest · GradBoost<br>NeuralNet · KNN · NaiveBayes</div>
         Realistic
       </button>
@@ -70,30 +415,65 @@
   </div>
 </div>
 
-<!-- App -->
+<!-- Reset confirmation modal -->
+<div id="reset-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:200;">
+  <div class="theme-card" style="max-width:360px;">
+    <h1 style="font-size:1.2rem;margin-bottom:10px;">Reset game?</h1>
+    <p style="margin-bottom:24px;">This will clear all progress and return you to the theme picker. Useful for testing — you'll start fresh as a new user.</p>
+    <div style="display:flex;gap:12px;justify-content:center;">
+      <button onclick="doReset()" style="padding:10px 28px;background:#ef4444;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;">Yes, reset</button>
+      <button onclick="document.getElementById('reset-overlay').style.display='none'" style="padding:10px 28px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Insight overlay (shown after clicking Continue in deploy result) -->
+<div id="insight-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:200;">
+  <div class="theme-card" style="max-width:480px;">
+    <p style="font-size:1rem;line-height:1.7;color:#374151;margin-bottom:28px;">Your model got very good at the examples it practiced on. But the real world sent examples it hadn't seen — drawn from the same population, but not the same points. This gap between your training sample and the full population is one of the central problems in ML. What if you could have tested your model <em>before</em> deploying it?</p>
+    <button onclick="goNextStage()" style="padding:12px 32px;background:#6366f1;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:1rem;width:100%;">Continue to Level 2 →</button>
+  </div>
+</div>
+
+<!-- Main app -->
 <div id="app">
   <header>
-    <div style="display:flex;align-items:center;gap:8px;">
+    <div style="display:flex;align-items:center;gap:8px">
       <h1>Split or Regret</h1>
       <span class="level-badge">Level 1</span>
     </div>
-    <div style="display:flex;gap:8px;">
-      <button class="header-btn" onclick="showThemePicker()">⚙ Theme</button>
-      <button id="models-btn" class="header-btn" onclick="showModelPicker()" style="display:none;">⚙ Models</button>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button id="hint-btn" onclick="showHint()" style="display:none;font-size:0.78rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--radius);padding:4px 10px;cursor:pointer;line-height:1.4;">💡 hint</button>
+      <div style="position:relative;">
+        <button id="menu-btn" onclick="toggleMenu()">&#9776;</button>
+        <div id="menu-dropdown">
+          <button class="menu-item" onclick="menuAction('theme')">⚙ Theme</button>
+          <button class="menu-item" id="menu-models" onclick="menuAction('models')" style="display:none;">⚙ Model Names</button>
+          <hr class="menu-divider">
+          <button class="menu-item danger" onclick="menuAction('reset')">↺ New Game</button>
+        </div>
+      </div>
     </div>
   </header>
 
   <main>
-    <div id="guide-banner" style="background:var(--surface);border:1px solid var(--accent);border-radius:var(--radius);padding:14px 18px;margin-bottom:14px;display:flex;align-items:flex-start;gap:12px;">
-      <span style="font-size:1.2rem;line-height:1;">👆</span>
-      <span id="guide-text" style="font-size:0.9rem;line-height:1.5;color:var(--text);">
-        Each block is a training example — a sentence, an image, or a data point a model can learn from. Select a small handful, then click <strong>Train</strong>.
-      </span>
-    </div>
-
-    <div id="grid-container">
-      <div class="section-label">Data — click or drag to select blocks for training</div>
-      <div id="data-grid"></div>
+    <div id="pool-zone">
+      <div id="grid-container">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;">
+          <div class="section-label" style="margin-bottom:0;">Data — your collected training examples</div>
+          <div id="class-legend" style="display:none;font-size:0.75rem;color:var(--muted);gap:10px;align-items:center;">
+            <span style="display:flex;align-items:center;gap:4px;">
+              <svg width="9" height="9" viewBox="0 0 10 10" style="color:var(--block-selected);flex-shrink:0;"><rect fill="currentColor" width="10" height="10"/></svg>
+              A: <span id="legend-a-count">0</span>
+            </span>
+            <span style="display:flex;align-items:center;gap:4px;">
+              <svg width="9" height="9" viewBox="0 0 10 10" style="color:var(--block-selected);flex-shrink:0;"><rect fill="currentColor" width="10" height="10"/><circle fill="var(--surface)" cx="5" cy="5" r="2.8"/></svg>
+              B: <span id="legend-b-count">0</span>
+            </span>
+          </div>
+        </div>
+        <div id="data-grid"></div>
+      </div>
     </div>
 
     <div id="controls">
@@ -102,89 +482,128 @@
         <div id="model-buttons" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
       </div>
       <div style="display:flex;align-items:center;gap:12px;width:100%;">
-        <button class="btn btn-train" onclick="trainModel()">▶ Train</button>
-        <button class="btn btn-secondary" onclick="clearSelection()">Clear</button>
-        <span class="count-label" id="count-label">0 / 120 blocks selected</span>
+        <button class="btn btn-collect" id="collect-btn">⊕ Collect Data</button>
+        <button class="btn btn-train" id="train-btn" onclick="trainModel()">▶ Train</button>
+        <button class="info-btn" onclick="showTooltip(this,event)" data-tip="train">i</button>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:5px;">
+          <span id="count-label" style="color:var(--muted);font-size:0.85rem;">0 / 120 examples collected</span>
+          <span id="population-pct" style="font-size:0.62rem;color:var(--muted);opacity:0.65;">(≈ 0.000% of all data)</span>
+          <button class="info-btn" onclick="showTooltip(this,event)" data-tip="population">i</button>
+        </div>
       </div>
     </div>
 
-    <div id="training-progress" style="display:none;margin-top:20px;">
+    <div id="training-progress" style="display:none; margin-top:20px;">
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
-        <div class="section-label" style="margin-bottom:10px;">Training…</div>
+        <div class="section-label" style="margin-bottom:10px">Training…</div>
         <div class="accuracy-bar-bg" style="height:16px;">
           <div id="progress-bar" style="height:100%;background:var(--train);border-radius:6px;width:0%;transition:none;"></div>
         </div>
-        <div id="progress-label" style="font-size:0.8rem;color:var(--muted);margin-top:8px;"></div>
+        <div id="progress-label" style="font-size:0.8rem;color:var(--muted);margin-top:8px;">0%</div>
       </div>
     </div>
 
     <div id="accuracy-panel">
       <div class="section-label">Results</div>
       <div class="accuracy-row">
-        <span class="accuracy-label" id="accuracy-model-label">Train accuracy</span>
+        <span style="display:inline-flex;align-items:center;gap:5px;">
+          <span class="accuracy-label" id="accuracy-model-label">Train accuracy</span>
+          <button class="info-btn" onclick="showTooltip(this,event)" data-tip="train-acc">i</button>
+        </span>
         <div class="accuracy-bar-bg"><div class="accuracy-bar" id="train-bar" style="width:0%"></div></div>
         <span class="accuracy-pct" id="train-pct">—</span>
       </div>
     </div>
 
+
     <div id="history-panel" style="display:none;margin-top:20px;">
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
-        <div class="section-label" style="margin-bottom:12px;">Run History</div>
+        <div class="section-label" style="margin-bottom:12px;">Best Models</div>
         <div id="history-list" style="display:flex;flex-direction:column;gap:8px;"></div>
       </div>
     </div>
 
-    <!-- Deploy section: appears after all 6 models tried -->
-    <div id="deploy-section" style="display:none;margin-top:24px;">
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
-        <div class="section-label" style="margin-bottom:12px;">🚀 Deploy your model</div>
-        <p style="font-size:0.88rem;color:var(--muted);margin-bottom:14px;">
-          You've trained all 6 models. Now pick one to ship — and see how it performs on data it's never seen before.
-        </p>
-        <div id="deploy-model-row" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
-        <button class="btn btn-train" id="deploy-btn" onclick="doL1Deploy()" style="margin-top:14px;">🚀 Deploy</button>
-        <div id="l1-stream" class="deploy-stream" style="display:none;"></div>
-        <div id="l1-results" style="display:none;margin-top:4px;">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-            <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;">
-              <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:6px;">Your training accuracy</div>
-              <div id="l1-cmp-train" style="font-size:1.8rem;font-weight:800;color:var(--train);">—</div>
-            </div>
-            <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;">
-              <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:6px;">Real-world accuracy</div>
-              <div id="l1-cmp-real" style="font-size:1.8rem;font-weight:800;">—</div>
-            </div>
-          </div>
-          <div id="l1-reveal-msg" style="display:none;margin-top:14px;padding:14px 16px;border-radius:var(--radius);line-height:1.6;font-size:0.9rem;"></div>
-        </div>
+    <div id="deploy-zone" style="display:none;margin-top:20px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+        <div class="section-label" style="margin-bottom:4px;">Real-world deployment</div>
+        <div id="deploy-grid"></div>
+        <div id="deploy-accuracy" style="font-size:0.82rem;color:var(--muted);margin-top:8px;">Incoming…</div>
+        <div id="deploy-result" style="margin-top:10px;"></div>
       </div>
     </div>
 
-    <!-- Next stage: appears after deploy -->
-    <div id="next-stage-container" style="display:none;margin-top:16px;">
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;text-align:center;">
-        <p style="color:var(--muted);font-size:0.9rem;line-height:1.6;max-width:520px;margin:0 auto 16px;">
-          <strong>Level 2 is a completely fresh start</strong> — a new dataset, a new problem, and a new set of models. Your task: learn to hold back a test set before training, so you have a reliable estimate before you deploy.
-        </p>
-        <button class="btn btn-next-stage" onclick="goNextStage()">Level 2: A New Dataset →</button>
+    <div id="deploy-section" style="display:none;margin-top:24px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+        <div class="section-label" style="margin-bottom:6px;">Deploy a model</div>
+        <p style="font-size:0.82rem;color:var(--muted);margin-bottom:14px;">Check the leaderboard for your best results, then pick a model to ship.</p>
+        <div id="deploy-model-buttons" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
+        <span style="display:inline-flex;align-items:center;gap:6px;">
+          <button class="btn btn-next-stage" id="deploy-confirm-btn" onclick="confirmDeploy()">Deploy →</button>
+          <button class="info-btn" onclick="showTooltip(this,event)" data-tip="deploy">i</button>
+        </span>
       </div>
+    </div>
+
+    <div id="next-stage-container" style="display:none;margin-top:24px;text-align:center;">
+      <button class="btn btn-next-stage" id="next-stage-btn" onclick="goNextStage()">Continue to Level 2 →</button>
+    </div>
+
+    <div id="guide-banner" style="background:var(--surface);border:1px solid var(--accent);border-radius:var(--radius);padding:12px 16px;margin:14px 0;display:flex;align-items:flex-start;gap:12px;cursor:pointer;" onclick="this.style.display='none';document.getElementById('hint-btn').style.display='';">
+      <span id="guide-emoji" style="font-size:1.2rem;line-height:1;">👆</span>
+      <span id="guide-text" style="font-size:0.9rem;line-height:1.5;color:var(--text);flex:1;">
+        Hold <strong>Collect Data</strong> to gather training examples. Release when you're ready, then click <strong>Train</strong>.
+      </span>
+      <span style="font-size:0.75rem;color:var(--muted);white-space:nowrap;padding-top:2px;">tap to dismiss</span>
     </div>
   </main>
 </div>
+<div id="tooltip"></div>
 
-<script src="js/state.js"></script>
-<script src="js/log.js"></script>
-<script src="js/themes.js"></script>
 <script>
-  // ── Init ─────────────────────────────────────────────────────────────
-  Themes.fromState();
-  State.setLevel(1, { started: true });
-  Log.event('level_start', { level: 1 });
+  // ── Tooltips ───────────────────────────────────────────────────────
+  const TIPS = {
+    'train':      'The model looks at your collected data and learns to recognize patterns.',
+    'train-acc':  'How often the model correctly predicted the label on the data it was trained on.',
+    'tune':       "Adjusts the model's internal settings to try to squeeze out better performance on the training data.",
+    'deploy':     'Send the model into the real world and see how it handles data it has never seen.',
+    'population': 'Your collected examples are a sample — a small slice drawn from a much larger population of all possible cases. Even 120 labeled examples is only 0.012% of a million-case population. A model trained on your sample must generalise to that whole population.',
+  };
 
-  // ── Constants & session state ─────────────────────────────────────────
-  const TOTAL              = 120;
-  const FIRST_RUN_CAP      = 50;
-  const ACCURACY_THRESHOLD = 85; // % needed to unlock models
+  function showTooltip(btn, e) {
+    e.stopPropagation();
+    const tip = document.getElementById('tooltip');
+    if (tip.style.display === 'block' && tip.dataset.src === btn.dataset.tip) {
+      tip.style.display = 'none'; return;
+    }
+    tip.textContent = TIPS[btn.dataset.tip] || '';
+    tip.dataset.src = btn.dataset.tip;
+    tip.style.display = 'block';
+    const r = btn.getBoundingClientRect();
+    const tw = Math.min(260, window.innerWidth - 20);
+    tip.style.maxWidth = tw + 'px';
+    let left = Math.min(r.left, window.innerWidth - tw - 10);
+    let top  = r.bottom + 6;
+    if (top + 80 > window.innerHeight) top = r.top - tip.offsetHeight - 6;
+    tip.style.left = Math.max(10, left) + 'px';
+    tip.style.top  = top + 'px';
+  }
+
+  document.addEventListener('click', () => {
+    document.getElementById('tooltip').style.display = 'none';
+  });
+
+  // ── Intro card ─────────────────────────────────────────────────────
+  if (localStorage.getItem('sor-intro-seen')) {
+    document.getElementById('intro-overlay').style.display = 'none';
+  }
+
+  function dismissIntro() {
+    localStorage.setItem('sor-intro-seen', '1');
+    document.getElementById('intro-overlay').style.display = 'none';
+  }
+
+  const TOTAL = 120;
+  const HALF  = Math.floor(TOTAL / 2); // 60 — first-train gate
 
   const MODEL_SETS = {
     greek:     ['α','β','γ','δ','ε','ζ'],
@@ -193,110 +612,316 @@
     realistic: ['SVM','RandForest','GradBoost','NeuralNet','KNN','NaiveBayes'],
   };
 
-  // Per-model accuracy curves: acc = clamp(base + ratio*scale + jitter*(rand-0.5))
+  // Per-model accuracy curves:
+  //   acc = clamp(base + totalRatio*scale + classBalance*classBias + jitter*(rand-0.5))
+  //   classBalance = (countA - countB) / selected.size  → range [-1, +1]
+  //   positive classBias = benefits from more Class A; negative = benefits from more Class B
   const MODEL_CURVES = [
-    { base: 0.52, scale: 0.40, jitter: 0.04 }, // 0: moderate, consistent
-    { base: 0.44, scale: 0.52, jitter: 0.04 }, // 1: needs data, high ceiling
-    { base: 0.63, scale: 0.26, jitter: 0.02 }, // 2: quick plateau
-    { base: 0.50, scale: 0.38, jitter: 0.12 }, // 3: high variance
-    { base: 0.40, scale: 0.57, jitter: 0.04 }, // 4: slow start, best ceiling
-    { base: 0.56, scale: 0.36, jitter: 0.03 }, // 5: reliable, high
+    { base: 0.52, scale: 0.38, jitter: 0.04, classBias:  0.00 }, // 0: truly balanced
+    { base: 0.44, scale: 0.46, jitter: 0.04, classBias:  0.18 }, // 1: A-specialist
+    { base: 0.63, scale: 0.22, jitter: 0.02, classBias: -0.15 }, // 2: B-specialist, quick plateau
+    { base: 0.50, scale: 0.36, jitter: 0.12, classBias:  0.08 }, // 3: high variance, slight A lean
+    { base: 0.40, scale: 0.54, jitter: 0.04, classBias: -0.20 }, // 4: B-specialist, slow start, high ceiling
+    { base: 0.56, scale: 0.33, jitter: 0.03, classBias:  0.07 }, // 5: reliable, slight A lean
   ];
 
-  let currentModelSet = State.get('modelSet') || 'greek';
-  let selectedModel   = 0;
-  let modelsTried     = new Set();
-  let selected        = new Set();
-  let dragging        = false;
-  let dragMode        = null;
-  let onboardPhase    = 0; // 0=first-run cap, 1=nudge more data, 2=chase ACCURACY_THRESHOLD, 3=model explore
-  let phase2Tries     = 0; // how many times trained in phase 2 without hitting threshold
-  let training        = false;
-  let allRuns         = [];
+  const SVG_A = `<svg viewBox="0 0 10 10"><rect class="block-fill" width="10" height="10"/></svg>`;
+  const SVG_B = `<svg viewBox="0 0 10 10"><rect class="block-fill" width="10" height="10"/><circle class="block-hole" cx="5" cy="5" r="2.8"/></svg>`;
 
-  // ── Grid ──────────────────────────────────────────────────────────────
+  let blockClasses = [];
+  let sessionClassARatio = 0.5;
+  function initBlockClasses() {
+    // 55/45 to 75/25 in favour of A, randomised each session
+    sessionClassARatio = 0.55 + Math.random() * 0.20;
+    blockClasses = Array.from({length: TOTAL}, () => Math.random() < sessionClassARatio ? 'A' : 'B');
+  }
+  initBlockClasses();
+
+  let currentModelSet = 'greek';
+  let selectedModel = 0;
+  let modelsTried = new Set();
+  let selected = new Set();
+  let onboardPhase = 0; // 0=collect up to HALF, 1=unlocked full set, 2=chase 90%, 3=model explore
+  let training = false;
+  let allRuns = [];
+  let hasTrainedOnce = false;
+  let collectTimer = null;
+  let collectHoldStart = null;
+
+  // ── Next-action pulse ──────────────────────────────────────────────
+  let _pulseEl = null;
+  let _pulseModelTrainShown = false;
+  function setPulse(id) {
+    if (_pulseEl) { _pulseEl.classList.remove('next-pulse'); _pulseEl = null; }
+    if (id) { _pulseEl = document.getElementById(id); if (_pulseEl) _pulseEl.classList.add('next-pulse'); }
+  }
+  function clearPulse() { setPulse(null); }
+
+  // ── Typewriter ─────────────────────────────────────────────────────
+  let twTimer = null;
+  const TW_CURSOR = '<span style="display:inline-block;width:0.55em;height:0.9em;background:currentColor;vertical-align:middle;margin-left:2px;opacity:0.85;"></span>';
+
+  function typewriter(el, html, duration = 1000) {
+    if (!document.body.classList.contains('theme-retro')) { el.innerHTML = html; return; }
+    if (twTimer) { clearTimeout(twTimer); twTimer = null; }
+    // Build steps: each visible character is one step; HTML tags are absorbed atomically
+    const steps = [];
+    let current = '';
+    let i = 0;
+    while (i < html.length) {
+      if (html[i] === '<') {
+        const end = html.indexOf('>', i);
+        if (end === -1) { current += html[i]; steps.push(current); i++; continue; }
+        current += html.slice(i, end + 1);
+        i = end + 1;
+      } else {
+        current += html[i];
+        steps.push(current);
+        i++;
+      }
+    }
+    if (steps.length === 0) { el.innerHTML = html; return; }
+    const delay = duration / steps.length;
+    let step = 0;
+    el.innerHTML = TW_CURSOR;
+    function tick() {
+      if (step < steps.length) {
+        el.innerHTML = steps[step] + TW_CURSOR;
+        step++;
+        twTimer = setTimeout(tick, delay);
+      } else {
+        twTimer = null;
+        el.innerHTML = html;
+      }
+    }
+    twTimer = setTimeout(tick, delay);
+  }
+
+  // ── Hover tooltips (blocks + disabled collect btn) ────────────────────
+  function showHoverTip(text, x, y) {
+    const tip = document.getElementById('tooltip');
+    tip.textContent = text;
+    tip.dataset.src = '';      // clear info-btn tracking so toggle logic doesn't confuse them
+    tip.style.maxWidth = '220px';
+    tip.style.display = 'block';
+    const left = Math.min(x + 14, window.innerWidth - 230);
+    const top  = y + 18;
+    tip.style.left = Math.max(10, left) + 'px';
+    tip.style.top  = top + 'px';
+  }
+  function hideHoverTip() {
+    document.getElementById('tooltip').style.display = 'none';
+  }
+
+  // Build grid
   const grid = document.getElementById('data-grid');
   for (let i = 0; i < TOTAL; i++) {
     const b = document.createElement('div');
     b.className = 'block';
     b.dataset.i = i;
+    b.innerHTML = SVG_A; // revealed on collection
+    b.addEventListener('mouseenter', e => {
+      const text = b.classList.contains('selected')
+        ? `ID ${i}: Class ${blockClasses[i]}`
+        : 'empty — not yet collected';
+      showHoverTip(text, e.clientX, e.clientY);
+    });
+    b.addEventListener('mouseleave', hideHoverTip);
     grid.appendChild(b);
   }
 
-  grid.addEventListener('dragstart', e => e.preventDefault());
-  grid.addEventListener('mousedown', e => {
-    const b = e.target.closest('.block');
-    if (!b) return;
-    e.preventDefault();
-    dragging = true;
-    dragMode = selected.has(+b.dataset.i) ? 'remove' : 'add';
-    applyToBlock(b);
-  });
-  grid.addEventListener('mouseover', e => {
-    if (!dragging) return;
-    const b = e.target.closest('.block');
-    if (b) applyToBlock(b);
-  });
-  document.addEventListener('mouseup', () => { dragging = false; dragMode = null; });
-
-  // Touch equivalents for drag-to-select
-  grid.addEventListener('touchstart', e => {
-    e.preventDefault();
-    const t = e.touches[0];
-    const el = document.elementFromPoint(t.clientX, t.clientY)?.closest('.block');
-    if (!el) return;
-    dragging = true;
-    dragMode = selected.has(+el.dataset.i) ? 'remove' : 'add';
-    applyToBlock(el);
-  }, { passive: false });
-
-  grid.addEventListener('touchmove', e => {
-    e.preventDefault();
-    const t = e.touches[0];
-    const el = document.elementFromPoint(t.clientX, t.clientY)?.closest('.block');
-    if (el) applyToBlock(el);
-  }, { passive: false });
-
-  grid.addEventListener('touchend', () => { dragging = false; dragMode = null; });
-
-  function applyToBlock(el) {
-    const i = +el.dataset.i;
-    if (dragMode === 'add') {
-      if (onboardPhase === 0 && selected.size >= FIRST_RUN_CAP) {
-        updateGuide('lock'); return;
-      }
-      selected.add(i); el.classList.add('selected');
-    } else {
-      selected.delete(i); el.classList.remove('selected');
-    }
-    updateCount();
-    if (onboardPhase === 0) updateGuide('selecting');
-  }
+  const POPULATION = 1000000;
 
   function updateCount() {
     document.getElementById('count-label').textContent =
-      `${selected.size} / ${TOTAL} blocks selected`;
-  }
-
-  function updateGuide(event) {
-    const banner = document.getElementById('guide-banner');
-    const text   = document.getElementById('guide-text');
-    if (event === 'lock') {
-      banner.style.borderColor = 'var(--train)';
-      text.innerHTML = `You've selected ${FIRST_RUN_CAP} blocks — that's enough for your first run. Click <strong>Train</strong> to see how your model does!`;
-    } else if (event === 'selecting' && selected.size > 0) {
-      banner.style.borderColor = 'var(--accent)';
-      text.innerHTML = `Good — you've picked ${selected.size} block${selected.size > 1 ? 's' : ''}. Click <strong>Train</strong> when you're ready, or grab a few more.`;
+      `${selected.size} / ${TOTAL} examples collected`;
+    const pct = (selected.size / POPULATION * 100).toFixed(3);
+    document.getElementById('population-pct').textContent = `(≈ ${pct}% of all data)`;
+    const countA = [...selected].filter(i => blockClasses[i] === 'A').length;
+    const countB = selected.size - countA;
+    const legend = document.getElementById('class-legend');
+    if (selected.size > 0) {
+      legend.style.display = 'flex';
+      document.getElementById('legend-a-count').textContent = countA;
+      document.getElementById('legend-b-count').textContent = countB;
+    } else {
+      legend.style.display = 'none';
     }
   }
 
-  function clearSelection() {
-    selected.clear();
-    document.querySelectorAll('.block').forEach(b => b.classList.remove('selected'));
-    updateCount();
+  // ── Data collection ────────────────────────────────────────────────
+  function collectCap() { return hasTrainedOnce ? TOTAL : HALF; }
+
+  function startCollecting() {
+    if (collectTimer !== null) return;
+    collectHoldStart = performance.now();
+    scheduleCollect(0);
   }
 
-  // ── Model panel ───────────────────────────────────────────────────────
+  function stopCollecting() {
+    if (collectTimer !== null) { clearTimeout(collectTimer); collectTimer = null; }
+  }
+
+  function scheduleCollect(delay) {
+    collectTimer = setTimeout(() => {
+      collectTimer = null;
+      if (!doCollectOne()) return;
+      const elapsed = performance.now() - collectHoldStart;
+      const t = Math.min(1, elapsed / 3000); // ramp over 3 s
+      scheduleCollect(Math.round(500 - t * 465)); // 500 ms → 35 ms
+    }, delay);
+  }
+
+  function doCollectOne() {
+    if (selected.size >= collectCap()) { stopCollecting(); return false; }
+    const empty = [];
+    for (let i = 0; i < TOTAL; i++) { if (!selected.has(i)) empty.push(i); }
+    if (!empty.length) { stopCollecting(); return false; }
+    animateBlockIn(empty[Math.floor(Math.random() * empty.length)]);
+    return true;
+  }
+
+  function animateBlockIn(idx) {
+    const targetBlock = document.querySelector(`.block[data-i="${idx}"]`);
+    const targetRect  = targetBlock.getBoundingClientRect();
+    const _pzr        = document.getElementById('pool-zone').getBoundingClientRect();
+    const popRect     = { left: _pzr.left - 72, right: _pzr.right + 72,
+                          top: _pzr.top - 50, bottom: _pzr.bottom + 50,
+                          width: _pzr.width + 144, height: _pzr.height + 100 };
+
+    // Pick a random point in the ambient pool margin
+    const edge = Math.floor(Math.random() * 4);
+    const gap  = 28;
+    let sx, sy;
+    if (edge === 0) { sx = popRect.left + Math.random() * popRect.width; sy = popRect.top    - gap; }
+    if (edge === 1) { sx = popRect.left + Math.random() * popRect.width; sy = popRect.bottom + gap; }
+    if (edge === 2) { sx = popRect.left  - gap; sy = popRect.top + Math.random() * popRect.height; }
+    if (edge === 3) { sx = popRect.right + gap; sy = popRect.top + Math.random() * popRect.height; }
+
+    const size = targetRect.width;
+    const flyer = document.createElement('div');
+    flyer.className = 'block-flyer';
+    flyer.style.cssText = `width:${size}px;height:${size}px;left:${sx - size/2}px;top:${sy - size/2}px;`;
+    flyer.innerHTML = blockClasses[idx] === 'A' ? SVG_A : SVG_B;
+    flyer.style.color = getComputedStyle(targetBlock).color;
+    document.body.appendChild(flyer);
+
+    const tx = targetRect.left - (sx - size/2);
+    const ty = targetRect.top  - (sy - size/2);
+
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      flyer.style.transition = 'transform 0.28s ease-out';
+      flyer.style.transform  = `translate(${tx}px,${ty}px)`;
+    }));
+
+    setTimeout(() => {
+      flyer.remove();
+      selected.add(idx);
+      targetBlock.innerHTML = blockClasses[idx] === 'A' ? SVG_A : SVG_B;
+      targetBlock.classList.add('selected', 'settling');
+      setTimeout(() => targetBlock.classList.remove('settling'), 300);
+      updateCount();
+      onBlockCollected();
+      spawnPoolBlock();
+    }, 310);
+  }
+
+  function positionGuide(anchorId, html, { color = 'var(--accent)', placement = 'after', scroll = true } = {}) {
+    const banner = document.getElementById('guide-banner');
+    const anchor = document.getElementById(anchorId);
+    const emoji  = document.getElementById('guide-emoji');
+    if (!anchor) return;
+    if (placement === 'after') { anchor.after(banner); emoji.textContent = '👆'; }
+    else                       { anchor.before(banner); emoji.textContent = '👇'; }
+    banner.style.display     = 'flex';
+    banner.style.borderColor = color;
+    document.getElementById('hint-btn').style.display = 'none';
+    typewriter(document.getElementById('guide-text'), html);
+    if (scroll) setTimeout(() => banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+  }
+
+  function showHint() {
+    const banner = document.getElementById('guide-banner');
+    banner.style.display = 'flex';
+    document.getElementById('hint-btn').style.display = 'none';
+    setTimeout(() => banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+  }
+
+  function onBlockCollected() {
+    if (selected.size >= TOTAL) {
+      document.getElementById('collect-btn').disabled = true;
+      positionGuide('controls', `That's all the labeled data available right now. In practice, getting more means going back to collect and label it — which takes time and money. Sometimes there simply isn't more yet, because it hasn't been generated by real users interacting with the system. Try training the model now to use the full dataset.`, { color: 'var(--muted)' });
+    } else if (!hasTrainedOnce && selected.size >= HALF) {
+      stopCollecting();
+      document.getElementById('collect-btn').disabled = true;
+      setPulse('train-btn');
+      positionGuide('controls', `You've collected ${HALF} examples. Now click <strong>Train</strong> to see how your model performs on this data!`, { color: 'var(--train)' });
+    }
+  }
+
+  // Wire up collect button
+  const collectBtn = document.getElementById('collect-btn');
+  collectBtn.addEventListener('mousedown',  e => { e.preventDefault(); clearPulse(); startCollecting(); });
+  collectBtn.addEventListener('touchstart', e => { e.preventDefault(); clearPulse(); startCollecting(); }, { passive: false });
+  collectBtn.addEventListener('mouseenter', e => {
+    if (collectBtn.disabled) showHoverTip('All available data has been collected.', e.clientX, e.clientY);
+  });
+  collectBtn.addEventListener('mouseleave', hideHoverTip);
+  document.addEventListener('mouseup',  stopCollecting);
+  document.addEventListener('touchend', stopCollecting);
+
+  // ── Ambient pool ───────────────────────────────────────────────────
+  const POOL_COUNT = 110;
+  const POOL_BS    = 14; // px
+  const POOL_MH    = 480; // how far out blocks can spread (px from grid edge)
+
+  function getPoolPos(pzW, pzH) {
+    const BS = POOL_BS, GAP = 6;
+    const left = Math.random() < 0.5;
+    // Bias toward the grid edge so density feels higher near the border
+    // then thins out — square-root distribution pushes most blocks close-ish
+    const t = Math.random();
+    const dist = BS + GAP + Math.pow(t, 2) * (POOL_MH - BS - GAP);
+    const x = left ? -dist : pzW + (dist - BS);
+    const y = Math.random() * Math.max(0, pzH - BS);
+    return { x, y, dist };
+  }
+
+  function spawnPoolBlock() {
+    const pz  = document.getElementById('pool-zone');
+    const pzW = pz.offsetWidth;
+    const pzH = pz.offsetHeight;
+    if (!pzW) return;
+    const el = document.createElement('div');
+    el.className = 'pool-block';
+    el.style.cssText = `width:${POOL_BS}px;height:${POOL_BS}px;opacity:0;`;
+    el.innerHTML = Math.random() < 0.5 ? SVG_A : SVG_B;
+    el.style.setProperty('--dx', (Math.random() * 28 - 14).toFixed(1) + 'px');
+    el.style.setProperty('--dy', (Math.random() * 18 - 9).toFixed(1) + 'px');
+    el.style.setProperty('--pd', (4 + Math.random() * 7).toFixed(1) + 's');
+    el.style.setProperty('--delay', (Math.random() * -16).toFixed(1) + 's');
+    const { x, y, dist } = getPoolPos(pzW, pzH);
+    el.style.left = x + 'px';
+    el.style.top  = y + 'px';
+    const isDark = document.body.classList.contains('theme-dark');
+    const baseMax = isDark ? 0.42 : 0.26;
+    const baseMin = isDark ? 0.14 : 0.08;
+    const targetOpacity = (baseMax - (baseMax - baseMin) * (dist / POOL_MH)).toFixed(3);
+    pz.appendChild(el);
+    requestAnimationFrame(() => requestAnimationFrame(() => { el.style.opacity = targetOpacity; }));
+  }
+
+  function initPool() {
+    const pz = document.getElementById('pool-zone');
+    pz.querySelectorAll('.pool-block').forEach(b => b.remove());
+    for (let i = 0; i < POOL_COUNT; i++) spawnPoolBlock();
+  }
+
+  function poolPause(on) {
+    document.getElementById('pool-zone').classList.toggle('pool-paused', on);
+  }
+
+  // ── Model buttons ──────────────────────────────────────────────────
   function renderModelButtons() {
     const container = document.getElementById('model-buttons');
     container.innerHTML = '';
@@ -306,86 +931,155 @@
         (i === selectedModel ? ' active' : '') +
         (modelsTried.has(i)  ? ' tried'  : '');
       btn.textContent = name;
-      btn.onclick = () => { selectedModel = i; renderModelButtons(); };
+      btn.onclick = () => {
+        selectedModel = i;
+        renderModelButtons();
+        if (!_pulseModelTrainShown) { setPulse('train-btn'); _pulseModelTrainShown = true; }
+      };
       container.appendChild(btn);
     });
+    updateDeployBtn();
   }
 
-  function showModelPanel() {
-    document.getElementById('model-panel').style.display = 'block';
-    document.getElementById('models-btn').style.display  = '';
-    renderModelButtons();
-    const banner = document.getElementById('guide-banner');
-    banner.style.display      = 'flex';
-    banner.style.borderColor  = 'var(--train)';
-    document.getElementById('guide-text').innerHTML =
-      `Each model learns differently — try all <strong>6 models</strong> to unlock the next stage.`;
-  }
+  function updateDeployBtn() {} // deploy section now inline; no button text to update
 
   function advanceToModelPhase() {
     onboardPhase = 3;
-    State.setLevel(1, { modelsUnlocked: true });
-    Log.event('models_unlocked', { level: 1 });
-    const savedSet = State.get('modelSet');
-    if (savedSet) {
-      currentModelSet = savedSet;
-      showModelPanel();
-    } else {
-      document.getElementById('modelset-title').textContent = 'Great work!';
-      document.getElementById('modelset-desc').textContent  =
-        "You've unlocked multiple models. First, pick a naming style for them.";
-      document.getElementById('modelset-overlay').style.display = 'flex';
-    }
-  }
-
-  function pickModelSet(set) {
-    currentModelSet = set;
-    State.set('modelSet', set);
-    document.getElementById('modelset-overlay').style.display = 'none';
-    if (onboardPhase >= 3) showModelPanel();
-  }
-
-  function showModelPicker() {
-    document.getElementById('modelset-title').textContent = 'Choose Your Models';
-    document.getElementById('modelset-desc').textContent  =
-      'Pick a naming style for the 6 models. You can change this anytime.';
+    // Ask them to pick a model naming style before revealing the panel
+    document.querySelector('#modelset-overlay h1').textContent = 'Great work!';
+    document.querySelector('#modelset-overlay p').textContent =
+      "You've unlocked multiple models. First, pick a naming style for them.";
     document.getElementById('modelset-overlay').style.display = 'flex';
   }
 
-  // ── Run history ───────────────────────────────────────────────────────
-  function renderHistory(newBest) {
+  // ── Run history ────────────────────────────────────────────────────
+
+  // ── Training ───────────────────────────────────────────────────────
+  function trainModel() {
+    if (selected.size === 0 || training || hasDeployed) return;
+    clearPulse();
+    training = true;
+    poolPause(true);
+
+    const trainBtn = document.querySelector('.btn-train');
+    trainBtn.disabled = true;
+    trainBtn.textContent = '⏳ Training…';
+
+    const duration = (selected.size / TOTAL) * 2500;
+    const start = performance.now();
+    const progressDiv   = document.getElementById('training-progress');
+    const progressBar   = document.getElementById('progress-bar');
+    const progressLabel = document.getElementById('progress-label');
+
+    document.getElementById('accuracy-panel').style.display = 'none';
+    progressDiv.style.display = 'block';
+
+    // Sweep animation across the data grid — synced to training duration
+    const sweep = document.createElement('div');
+    sweep.className = 'train-sweep';
+    sweep.style.animationDuration = duration + 'ms';
+    document.getElementById('data-grid').appendChild(sweep);
+    sweep.addEventListener('animationend', () => { sweep.remove(); finishTraining(); }, { once: true });
+
+    function tick() {
+      const raw   = (performance.now() - start) / duration;
+      const eased = raw < 0.5 ? 2*raw*raw : 1 - Math.pow(-2*raw+2, 2)/2;
+      const pct   = Math.min(100, Math.round(eased * 100));
+      progressBar.style.width = pct + '%';
+      progressLabel.textContent =
+        `Training on example ${Math.min(selected.size, Math.ceil(eased * selected.size))} / ${selected.size}`;
+      if (raw < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    function finishTraining() {
+      progressDiv.style.display = 'none';
+      training = false;
+      poolPause(false);
+      trainBtn.disabled = false;
+      trainBtn.textContent = '▶ Train';
+
+      const ratio        = selected.size / TOTAL;
+      const countA       = [...selected].filter(i => blockClasses[i] === 'A').length;
+      const classBalance = selected.size > 0 ? (countA - (selected.size - countA)) / selected.size : 0;
+      const curve        = MODEL_CURVES[selectedModel];
+      const acc          = Math.min(0.98, Math.max(0.50,
+        curve.base + ratio * curve.scale + classBalance * curve.classBias + curve.jitter * (Math.random() - 0.5)));
+      const pct   = Math.round(acc * 100);
+      const modelName = MODEL_SETS[currentModelSet][selectedModel];
+
+      const prevBest  = allRuns.length ? Math.max(...allRuns.map(r => r.pct)) : -1;
+      const isNewBest = pct > prevBest;
+      const collectedA = [...selected].filter(i => blockClasses[i] === 'A').length;
+      allRuns.unshift({ pct, blocks: selected.size, id: allRuns.length + 1, model: modelName, modelIdx: selectedModel, classARatio: sessionClassARatio, collectedA, collectedB: selected.size - collectedA });
+
+      const panel = document.getElementById('accuracy-panel');
+      panel.style.display = 'block';
+      document.getElementById('accuracy-model-label').textContent = `${modelName} accuracy`;
+      requestAnimationFrame(() => {
+        document.getElementById('train-bar').style.transition = 'width 0.6s ease';
+        document.getElementById('train-bar').style.width = pct + '%';
+        document.getElementById('train-pct').textContent = pct + '%';
+      });
+
+      renderHistory(isNewBest);
+
+      // ── Onboarding state machine ──
+      if (onboardPhase === 0) {
+        onboardPhase = 1;
+        hasTrainedOnce = true;
+        document.getElementById('collect-btn').disabled = false;
+        setPulse('collect-btn');
+        positionGuide('accuracy-panel', `${pct}% — not bad! You can now collect a bit more data. Retrain to see if you can do better.`);
+
+      } else if (onboardPhase === 1) {
+        if (pct >= 85) {
+          advanceToModelPhase();
+        } else {
+          onboardPhase = 2;
+          positionGuide('accuracy-panel', `Getting closer! Can you push past <strong>85% accuracy</strong>? Try collecting more data or retraining.`);
+        }
+
+      } else if (onboardPhase === 2) {
+        if (pct >= 85) advanceToModelPhase();
+
+      } else if (onboardPhase === 3) {
+        modelsTried.add(selectedModel);
+        renderModelButtons();
+        if (modelsTried.size >= 6) {
+          const deploySection = document.getElementById('deploy-section');
+          if (deploySection.style.display === 'none') {
+            deployPickIdx = -1;
+            renderDeploySection();
+            deploySection.style.display = 'block';
+            setPulse('deploy-section');
+            positionGuide('deploy-section', `You've trained all 6 models. Check the <strong>Best Models</strong> leaderboard above, pick the one you trust most, then click <strong>Deploy →</strong>.`, { color: 'var(--train)', placement: 'after' });
+          }
+        }
+      }
+    }
+  }
+
+  // ── Best models leaderboard ────────────────────────────────────────
+  function renderHistory(isNewBest) {
     const panel = document.getElementById('history-panel');
     const list  = document.getElementById('history-list');
-    if (allRuns.length < 2) { panel.style.display = 'none'; return; }
+    if (!allRuns.length) { panel.style.display = 'none'; return; }
     panel.style.display = 'block';
     list.innerHTML = '';
-
-    list.appendChild(makeRunEntry(allRuns[1], 'previous', false));
-
-    const divider = document.createElement('div');
-    divider.style.cssText = 'font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-top:8px;margin-bottom:4px;';
-    divider.textContent = 'Top 3';
-    list.appendChild(divider);
-
     [...allRuns].sort((a, b) => b.pct - a.pct).slice(0, 3).forEach((run, rank) => {
-      const isNewBest = newBest && rank === 0 && run === allRuns[0];
-      list.appendChild(makeRunEntry(run, 'top', isNewBest, rank + 1));
+      list.appendChild(makeRunEntry(run, rank, isNewBest && rank === 0 && run === allRuns[0]));
     });
   }
 
-  function makeRunEntry(run, type, isNewBest, rank) {
-    const el  = document.createElement('div');
+  function makeRunEntry(run, rank, isNewBest) {
+    const el = document.createElement('div');
     el.className = 'run-entry' + (isNewBest ? ' new-best' : '');
 
     const tag = document.createElement('span');
-    tag.className = 'run-tag ' + (type === 'previous' ? 'tag-previous' : rank === 1 ? 'tag-best' : 'tag-top');
-    tag.textContent = type === 'previous' ? 'Previous' : `#${rank}`;
+    tag.className = 'run-tag ' + (rank === 0 ? 'tag-best' : 'tag-top');
+    tag.textContent = `#${rank + 1}`;
     el.appendChild(tag);
-
-    const runId = document.createElement('span');
-    runId.className = 'run-id';
-    runId.textContent = `Run ${run.id}`;
-    el.appendChild(runId);
 
     if (run.model) {
       const ml = document.createElement('span');
@@ -403,18 +1097,15 @@
 
     const data = document.createElement('span');
     data.className = 'run-data';
-    data.textContent = `${run.blocks} / ${TOTAL} blocks`;
+    data.textContent = `${run.blocks} examples`;
     el.appendChild(data);
 
     const right = document.createElement('div');
     right.className = 'run-right';
-    const barBg = document.createElement('div');
-    barBg.className = 'run-mini-bar-bg';
-    const bar = document.createElement('div');
-    bar.className = 'run-mini-bar';
+    const barBg = document.createElement('div'); barBg.className = 'run-mini-bar-bg';
+    const bar   = document.createElement('div'); bar.className = 'run-mini-bar';
     bar.style.width = run.pct + '%';
-    barBg.appendChild(bar);
-    right.appendChild(barBg);
+    barBg.appendChild(bar); right.appendChild(barBg);
     const score = document.createElement('span');
     score.className = 'run-score';
     score.textContent = run.pct + '%';
@@ -423,269 +1114,322 @@
     return el;
   }
 
-  // ── Training ──────────────────────────────────────────────────────────
-  function trainModel() {
-    if (selected.size === 0 || training) return;
-    training = true;
+  let deployPickIdx = 0;
+  let hasDeployed = false;
 
-    const trainBtn    = document.querySelector('.btn-train');
+  function lockPostDeploy() {
+    hasDeployed = true;
+    poolPause(true);
+    const trainBtn = document.querySelector('.btn-train');
     trainBtn.disabled = true;
-    trainBtn.textContent = '⏳ Training…';
-
-    const duration      = (selected.size / TOTAL) * 5000;
-    const start         = performance.now();
-    const progressDiv   = document.getElementById('training-progress');
-    const progressBar   = document.getElementById('progress-bar');
-    const progressLabel = document.getElementById('progress-label');
-
-    document.getElementById('accuracy-panel').style.display = 'none';
-    progressDiv.style.display = 'block';
-
-    function tick() {
-      const raw   = (performance.now() - start) / duration;
-      const eased = raw < 0.5 ? 2*raw*raw : 1 - Math.pow(-2*raw+2, 2)/2;
-      const pct   = Math.min(100, Math.round(eased * 100));
-      progressBar.style.width  = pct + '%';
-      progressLabel.textContent =
-        `Training on example ${Math.min(selected.size, Math.ceil(eased * selected.size))} / ${selected.size}`;
-      raw < 1 ? requestAnimationFrame(tick) : finishTraining();
-    }
-    requestAnimationFrame(tick);
-
-    function finishTraining() {
-      progressDiv.style.display = 'none';
-      training = false;
-      trainBtn.disabled    = false;
-      trainBtn.textContent = '▶ Train';
-
-      const ratio     = selected.size / TOTAL;
-      const curve     = MODEL_CURVES[selectedModel];
-      const acc       = Math.min(0.98, Math.max(0.50,
-        curve.base + ratio * curve.scale + curve.jitter * (Math.random() - 0.5)));
-      const pct       = Math.round(acc * 100);
-      const modelName = onboardPhase >= 3 ? MODEL_SETS[currentModelSet][selectedModel] : null;
-
-      const prevBest  = allRuns.length ? Math.max(...allRuns.map(r => r.pct)) : -1;
-      const isNewBest = pct > prevBest;
-      allRuns.unshift({ pct, blocks: selected.size, id: allRuns.length + 1, model: modelName });
-
-      // Persist summary to state & log
-      const lvl = State.getLevel(1);
-      State.setLevel(1, { runCount: lvl.runCount + 1, bestAccuracy: Math.max(lvl.bestAccuracy, pct) });
-      Log.event('train', { level: 1, model: modelName, blocks: selected.size, accuracy: pct });
-
-      // Show result
-      const panel = document.getElementById('accuracy-panel');
-      panel.style.display = 'block';
-      document.getElementById('accuracy-model-label').textContent =
-        modelName ? `${modelName} accuracy` : 'Train accuracy';
-      requestAnimationFrame(() => {
-        document.getElementById('train-bar').style.transition = 'width 0.6s ease';
-        document.getElementById('train-bar').style.width      = pct + '%';
-        document.getElementById('train-pct').textContent      = pct + '%';
-      });
-
-      renderHistory(isNewBest);
-
-      // ── Onboarding state machine ──────────────────────────────────────
-      const banner = document.getElementById('guide-banner');
-      const text   = document.getElementById('guide-text');
-
-      if (onboardPhase === 0) {
-        onboardPhase = 1;
-        banner.style.display     = 'flex';
-        banner.style.borderColor = 'var(--accent)';
-        text.innerHTML = `Not bad! But notice that accuracy — now try selecting <strong>more data</strong> and training again to see what happens.`;
-
-      } else if (onboardPhase === 1) {
-        if (pct >= ACCURACY_THRESHOLD) {
-          advanceToModelPhase();
-        } else {
-          onboardPhase = 2;
-          banner.style.display     = 'flex';
-          banner.style.borderColor = 'var(--accent)';
-          text.innerHTML = `Getting there! See if you can hit <strong>${ACCURACY_THRESHOLD}%</strong> — try adding even more blocks and training again.`;
-        }
-
-      } else if (onboardPhase === 2) {
-        if (pct >= ACCURACY_THRESHOLD) {
-          advanceToModelPhase();
-        } else {
-          phase2Tries++;
-          if (phase2Tries >= 3) {
-            banner.style.display     = 'flex';
-            banner.style.borderColor = 'var(--accent)';
-            text.innerHTML = `Still under ${ACCURACY_THRESHOLD}%? Try selecting <strong>as many blocks as you can</strong> — the more training data, the better.`;
-          }
-        }
-
-      } else if (onboardPhase === 3) {
-        modelsTried.add(selectedModel);
-        State.setLevel(1, { modelsTried: [...modelsTried] });
-        renderModelButtons();
-        if (modelsTried.size >= 6) {
-          const deploySection = document.getElementById('deploy-section');
-          if (deploySection.style.display === 'none') {
-            showDeploySection();
-            Log.event('all_models_tried', { level: 1 });
-          }
-        }
-      }
-    }
+    trainBtn.title = 'You\'ve already deployed — decisions are locked in.';
+    document.getElementById('collect-btn').disabled = true;
+    document.querySelectorAll('#model-buttons .model-btn').forEach(b => {
+      b.disabled = true;
+      b.style.opacity = '0.45';
+      b.style.cursor = 'default';
+    });
   }
 
   function goNextStage() {
-    State.setLevel(1, { completed: true });
-    Log.event('level_complete', { level: 1 });
-    window.location.href = 'level2.html';
+    document.getElementById('insight-overlay').style.display = 'none';
+    // Bridge theme + model set into the shared state system level 2 reads from
+    const currentTheme = document.body.className.replace('theme-', '');
+    const sor = JSON.parse(localStorage.getItem('sor_state') || '{}');
+    sor.theme    = currentTheme;
+    sor.modelSet = currentModelSet;
+    localStorage.setItem('sor_state', JSON.stringify(sor));
+    window.location.href = 'interstitial.html';
   }
 
-  // ── Theme picker ──────────────────────────────────────────────────────
-  function showThemePicker() {
-    document.getElementById('theme-overlay').style.display = 'flex';
-  }
-
-  function changeTheme(t) {
-    State.set('theme', t);
-    Themes.apply(t);
-    document.getElementById('theme-overlay').style.display = 'none';
-    Log.event('theme_change', { theme: t });
-  }
-
-  // ── Deploy (Level 1) ──────────────────────────────────────────────────
-  // Real-world accuracies: deliberately inverted from training rankings.
-  // Training best→worst: 4 > 1 > 0 ≈ 5 > 2 > 3
-  // Real-world best→worst: 2 > 3 > 5 > 0 > 1 > 4
-  // This ensures students always see a rank flip on deploy.
-  const REAL_WORLD_ACCS = [0.70, 0.64, 0.79, 0.75, 0.61, 0.72];
-
-  let deployModelIdx = 0;
-  let l1Deployed     = false;
-
-  function showDeploySection() {
-    deployModelIdx = selectedModel; // default to currently selected
-    const section = document.getElementById('deploy-section');
-    section.style.display = 'block';
-    renderDeployModelBtns();
-
-    const banner = document.getElementById('guide-banner');
-    const text   = document.getElementById('guide-text');
-    banner.style.display      = 'flex';
-    banner.style.borderColor  = 'var(--train)';
-    text.innerHTML = `You've tried all 6 models. Now pick one to <strong>deploy</strong> — and see how it holds up on data it's never seen before.`;
-
-    setTimeout(() => section.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
-  }
-
-  function renderDeployModelBtns() {
-    const labels = MODEL_SETS[currentModelSet];
-    const c = document.getElementById('deploy-model-row');
-    c.innerHTML = '';
-    labels.forEach((lbl, i) => {
+  function renderDeploySection() {
+    const container = document.getElementById('deploy-model-buttons');
+    container.innerHTML = '';
+    MODEL_SETS[currentModelSet].forEach((name, i) => {
       const btn = document.createElement('button');
-      btn.className = 'model-btn' + (i === deployModelIdx ? ' active' : '');
-      btn.textContent = lbl;
-      btn.onclick = () => { deployModelIdx = i; renderDeployModelBtns(); };
-      c.appendChild(btn);
+      btn.className = 'model-btn' + (i === deployPickIdx ? ' active' : '');
+      btn.textContent = name;
+      btn.onclick = () => {
+        deployPickIdx = i;
+        renderDeploySection();
+        setPulse('deploy-confirm-btn');
+      };
+      container.appendChild(btn);
     });
+    document.getElementById('deploy-confirm-btn').disabled = deployPickIdx === -1;
   }
 
-  function getRealWorldAccs(deployIdx) {
-    // Add small noise to each model's real-world base accuracy
-    const accs = REAL_WORLD_ACCS.map(a => a + 0.03 * (Math.random() - 0.5));
-
-    // Find the natural real-world winner
-    const bestIdx = accs.reduce((bi, a, i) => a > accs[bi] ? i : bi, 0);
-
-    // If the deployed model would naturally win (user got lucky), shift best to next-best
-    if (bestIdx === deployIdx) {
-      const nextBest = accs.map((a, i) => [a, i])
-                           .filter(([, i]) => i !== deployIdx)
-                           .sort(([a], [b]) => b - a)[0][1];
-      accs[nextBest] = accs[deployIdx] + 0.04 + Math.random() * 0.03;
-    }
-    return accs;
+  function confirmDeploy() {
+    if (deployPickIdx === -1) return;
+    clearPulse();
+    selectedModel = deployPickIdx;
+    document.getElementById('deploy-section').style.display = 'none';
+    lockPostDeploy();
+    runDeploy();
   }
 
-  function doL1Deploy() {
-    if (l1Deployed || training) return;
-    l1Deployed = true;
-    document.getElementById('deploy-btn').disabled    = true;
-    document.getElementById('deploy-btn').textContent = 'Deploying…';
+  function runDeploy() {
 
-    const realAccs      = getRealWorldAccs(deployModelIdx);
-    const deployedReal  = realAccs[deployModelIdx];
-    const bestRealIdx   = realAccs.reduce((bi, a, i) => a > realAccs[bi] ? i : bi, 0);
+    const N = 20;
+    const ratio = selected.size / TOTAL;
 
-    // Best training accuracy we observed for the deployed model
-    const deployedName  = MODEL_SETS[currentModelSet][deployModelIdx];
-    const modelRuns     = allRuns.filter(r => r.model === deployedName);
-    const bestTrainPct  = modelRuns.length > 0
-      ? Math.max(...modelRuns.map(r => r.pct))
-      : Math.max(...allRuns.filter(r => r.pct).map(r => r.pct), 80);
+    // Per-session noise so each deploy is slightly different but internally consistent
+    const noise = MODEL_CURVES.map(() => (Math.random() - 0.5) * 0.07);
 
-    // Animate 30 data points
-    const streamEl = document.getElementById('l1-stream');
-    streamEl.style.display = 'grid';
-    streamEl.innerHTML = '';
-    const dots = Array.from({ length: 30 }, () => {
-      const d = document.createElement('div');
-      d.className = 'deploy-dot';
-      streamEl.appendChild(d);
-      return d;
-    });
-
-    let correct = 0, i = 0;
-    const tick = setInterval(() => {
-      if (i === 30) {
-        clearInterval(tick);
-        finalizeL1Deploy(bestTrainPct, correct / 30, realAccs, bestRealIdx, deployedName);
-        return;
+    function deployPctFor(idx) {
+      const runs = allRuns.filter(r => r.modelIdx === idx);
+      if (!runs.length) {
+        // Never trained — estimate from curve
+        const c = MODEL_CURVES[idx];
+        return Math.round(Math.max(40, (c.base + ratio * c.scale - 0.14 + noise[idx]) * 100));
       }
-      const hit = Math.random() < deployedReal;
-      if (hit) correct++;
-      dots[i].className = 'deploy-dot ' + (hit ? 'correct' : 'wrong');
-      i++;
-    }, 110);
+      const trainAcc = Math.max(...runs.map(r => r.pct)) / 100;
+      const gap = 0.08 + 0.10 * ratio + noise[idx];
+      return Math.round(Math.max(40, (trainAcc - gap) * 100));
+    }
 
-    Log.event('l1_deploy', { deployModelIdx, deployedReal, bestRealIdx });
+    const allDeployPcts = MODEL_CURVES.map((_, i) => deployPctFor(i));
+    const userIdx       = selectedModel;
+    const userPct       = allDeployPcts[userIdx];
+    const bestPct       = Math.max(...allDeployPcts);
+    const bestIdx       = allDeployPcts.indexOf(bestPct);
+    const userTrainPct  = allRuns.filter(r => r.modelIdx === userIdx).length
+      ? Math.max(...allRuns.filter(r => r.modelIdx === userIdx).map(r => r.pct))
+      : null;
+
+    // Pre-compute which of the N points the user's model gets right
+    const correct = Math.round(userPct / 100 * N);
+    const outcomes = Array(N).fill(false);
+    for (let i = 0; i < correct; i++) outcomes[i] = true;
+    for (let i = N - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [outcomes[i], outcomes[j]] = [outcomes[j], outcomes[i]];
+    }
+    const ptTypes = Array.from({length: N}, () => Math.random() < 0.5 ? 'A' : 'B');
+
+    // Show deploy zone and populate empty slots
+    const deployZone = document.getElementById('deploy-zone');
+    deployZone.style.display = 'block';
+    const deployGrid = document.getElementById('deploy-grid');
+    deployGrid.innerHTML = '';
+    for (let i = 0; i < N; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'deploy-slot';
+      slot.id = `ds-${i}`;
+      deployGrid.appendChild(slot);
+    }
+    document.getElementById('deploy-accuracy').textContent = 'Incoming data…';
+    document.getElementById('deploy-result').innerHTML = '';
+
+    // Fly points in one by one
+    let landed = 0;
+    function flyPoint(i) {
+      if (i >= N) return;
+      const slot    = document.getElementById(`ds-${i}`);
+      const slotRect = slot.getBoundingClientRect();
+      const _pzr2   = document.getElementById('pool-zone').getBoundingClientRect();
+      const popRect  = { left: _pzr2.left - 72, right: _pzr2.right + 72,
+                         top: _pzr2.top - 50, bottom: _pzr2.bottom + 50,
+                         width: _pzr2.width + 144, height: _pzr2.height + 100 };
+
+      const edge = Math.floor(Math.random() * 4);
+      const gap  = 28;
+      let sx, sy;
+      if (edge === 0) { sx = popRect.left + Math.random() * popRect.width; sy = popRect.top    - gap; }
+      if (edge === 1) { sx = popRect.left + Math.random() * popRect.width; sy = popRect.bottom + gap; }
+      if (edge === 2) { sx = popRect.left  - gap; sy = popRect.top + Math.random() * popRect.height; }
+      if (edge === 3) { sx = popRect.right + gap; sy = popRect.top + Math.random() * popRect.height; }
+
+      const size = slotRect.width;
+      const flyer = document.createElement('div');
+      flyer.className = 'block-flyer';
+      flyer.style.cssText = `width:${size}px;height:${size}px;left:${sx-size/2}px;top:${sy-size/2}px;`;
+      flyer.style.color = `var(--block-default)`;
+      flyer.innerHTML = ptTypes[i] === 'A' ? SVG_A : SVG_B;
+      document.body.appendChild(flyer);
+
+      const tx = slotRect.left - (sx - size/2);
+      const ty = slotRect.top  - (sy - size/2);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        flyer.style.transition = 'transform 0.28s ease-out';
+        flyer.style.transform  = `translate(${tx}px,${ty}px)`;
+      }));
+
+      setTimeout(() => {
+        flyer.remove();
+        slot.className = `block deploy-block ${outcomes[i] ? 'correct' : 'incorrect'} settling`;
+        slot.innerHTML = ptTypes[i] === 'A' ? SVG_A : SVG_B;
+        setTimeout(() => slot.classList.remove('settling'), 300);
+
+        if (!outcomes[i]) {
+          const r = slot.getBoundingClientRect();
+          const miss = document.createElement('span');
+          miss.className = 'miss-label';
+          miss.textContent = 'miss!';
+          miss.style.left = `${r.left + r.width / 2}px`;
+          miss.style.top  = `${r.top}px`;
+          document.body.appendChild(miss);
+          setTimeout(() => miss.remove(), 700);
+        }
+
+        landed++;
+        const runAcc = Math.round(outcomes.slice(0, landed).filter(Boolean).length / landed * 100);
+        document.getElementById('deploy-accuracy').textContent =
+          `${landed} / ${N} classified — real-world accuracy so far: ${runAcc}%`;
+
+        if (landed === N) showDeployResult(userIdx, userPct, userTrainPct, bestIdx, bestPct);
+      }, 310);
+
+      setTimeout(() => flyPoint(i + 1), 175 + Math.random() * 75);
+    }
+    flyPoint(0);
   }
 
-  function finalizeL1Deploy(trainPct, realAcc, allRealAccs, bestRealIdx, deployedName) {
-    const realPct       = Math.round(realAcc * 100);
-    const bestModelName = MODEL_SETS[currentModelSet][bestRealIdx];
-    const bestRealPct   = Math.round(allRealAccs[bestRealIdx] * 100);
-    const gap           = trainPct - realPct;
+  function showDeployResult(userIdx, userPct, userTrainPct, bestIdx, bestPct) {
+    const resultEl = document.getElementById('deploy-result');
+    const userName = MODEL_SETS[currentModelSet][userIdx];
+    const bestName = MODEL_SETS[currentModelSet][bestIdx];
 
-    document.getElementById('l1-results').style.display = 'block';
-    document.getElementById('l1-cmp-train').textContent = trainPct + '%';
-    document.getElementById('l1-cmp-real').textContent  = realPct + '%';
-    document.getElementById('l1-cmp-real').style.color  = gap > 5 ? 'var(--test)' : 'var(--train)';
+    // Hide the guide banner — the inline result takes over
+    document.getElementById('guide-banner').style.display = 'none';
+    document.getElementById('hint-btn').style.display = '';
 
-    const msg = document.getElementById('l1-reveal-msg');
-    msg.style.display    = 'block';
-    msg.style.border     = '1px solid var(--test)';
-    msg.style.background = 'color-mix(in srgb, var(--test) 10%, var(--surface))';
-    msg.innerHTML = `
-      🔴 <strong>${gap}% gap.</strong> <strong>${deployedName}</strong> looked great on your training data (${trainPct}%)
-      — a completely reasonable pick. But on real users it only managed ${realPct}%.<br><br>
-      <strong>${bestModelName}</strong> would have hit <strong>${bestRealPct}%</strong> in production — but your training
-      data gave you no way to know that.<br><br>
-      <em>This is why training accuracy can be misleading. In Level 2, you'll hold back a test set before training
-      so you have a real estimate — not just a training score.</em>
-    `;
+    // Brief "oh no" message
+    let html = `<div style="display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid var(--border);">`;
+    html += `<p style="font-size:0.9rem;color:var(--text);">Oh no! <strong>${userName}</strong> didn't perform as well in the real world as it did on your training data.</p>`;
 
-    State.setLevel(1, { completed: true });
-    Log.event('l1_deploy_done', { trainPct, realPct, bestRealIdx, bestRealPct });
+    // Selected model stats
+    if (userTrainPct !== null) {
+      const gap = userTrainPct - userPct;
+      html += `<div style="font-size:0.85rem;">
+        <strong>${userName}</strong>: training ${userTrainPct}% → real-world
+        <strong style="color:#ef4444;">${userPct}%</strong>
+        <span style="color:var(--muted);font-size:0.78rem;">(−${gap}% gap)</span>
+      </div>`;
+    }
 
-    setTimeout(() => {
-      document.getElementById('next-stage-container').style.display = 'block';
-      document.getElementById('next-stage-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      const banner = document.getElementById('guide-banner');
-      banner.style.borderColor = 'var(--accent)';
-      document.getElementById('guide-text').innerHTML =
-        `Now you've seen the problem firsthand. Level 2 introduces the solution: a held-out test set.`;
-    }, 700);
+    // Better model note
+    if (bestIdx !== userIdx) {
+      html += `<div style="font-size:0.85rem;color:var(--muted);">
+        Note: <strong style="color:var(--text);">${bestName}</strong> would have achieved
+        <strong style="color:var(--train);">${bestPct}%</strong> on the real-world data!
+      </div>`;
+    }
+
+    html += `</div>`;
+    resultEl.innerHTML = html;
+
+    // Pulsing continue button
+    const continueBtn = document.createElement('button');
+    continueBtn.id = 'deploy-continue-btn';
+    continueBtn.className = 'btn btn-next-stage';
+    continueBtn.style.cssText = 'margin-top:16px;font-size:0.95rem;padding:10px 28px;';
+    continueBtn.textContent = 'Continue →';
+    continueBtn.onclick = showInsightOverlay;
+    resultEl.appendChild(continueBtn);
+    setPulse('deploy-continue-btn');
+  }
+
+  function showInsightOverlay() {
+    clearPulse();
+    document.getElementById('insight-overlay').style.display = 'flex';
+  }
+
+  // ── Hamburger menu ─────────────────────────────────────────────────
+  function toggleMenu() {
+    document.getElementById('menu-dropdown').classList.toggle('open');
+  }
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#menu-btn') && !e.target.closest('#menu-dropdown')) {
+      document.getElementById('menu-dropdown').classList.remove('open');
+    }
+  });
+
+  function menuAction(action) {
+    document.getElementById('menu-dropdown').classList.remove('open');
+    if (action === 'theme')  document.getElementById('theme-overlay').style.display = 'flex';
+    if (action === 'models') document.getElementById('modelset-overlay').style.display = 'flex';
+    if (action === 'reset')  document.getElementById('reset-overlay').style.display = 'flex';
+  }
+
+  // ── Theme & model set pickers ──────────────────────────────────────
+  function pickTheme(t) {
+    document.body.className = 'theme-' + t;
+    document.documentElement.style.fontSize = t === 'retro' ? '18px' : '';
+    document.getElementById('theme-overlay').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    initPool();
+    positionGuide('controls', `Hold <strong>Collect Data</strong> to gather training examples. Release when you're ready, then click <strong>Train</strong>.`, { scroll: false });
+    setPulse('collect-btn');
+  }
+
+  function pickModelSet(set) {
+    currentModelSet = set;
+    document.getElementById('modelset-overlay').style.display = 'none';
+    if (onboardPhase >= 3) {
+      document.getElementById('model-panel').style.display = 'block';
+      document.getElementById('menu-models').style.display = '';
+      renderModelButtons();
+      setPulse('model-panel');
+      positionGuide('model-panel', `Each model learns differently. Pick one and click <strong>Train</strong> — try all 6.`, { color: 'var(--train)' });
+    }
+  }
+
+  // ── Dev reset ─────────────────────────────────────────────────────
+  function confirmReset() {
+    document.getElementById('reset-overlay').style.display = 'flex';
+  }
+
+  function doReset() {
+    clearPulse();
+    _pulseModelTrainShown = false;
+    stopCollecting();
+    document.querySelectorAll('.block-flyer').forEach(f => f.remove());
+    currentModelSet = 'greek';
+    selectedModel = 0;
+    modelsTried = new Set();
+    selected = new Set();
+    onboardPhase = 0;
+    training = false;
+    allRuns = [];
+    hasTrainedOnce = false;
+    hasDeployed = false;
+    collectHoldStart = null;
+
+    // Reset UI
+    initBlockClasses();
+    document.getElementById('pool-zone').querySelectorAll('.pool-block').forEach(b => b.remove());
+    document.querySelectorAll('.block').forEach(b => {
+      b.classList.remove('selected');
+      b.innerHTML = SVG_A; // revealed on collection
+    });
+    updateCount();
+
+    document.getElementById('accuracy-panel').style.display = 'none';
+    document.getElementById('history-panel').style.display = 'none';
+    document.getElementById('training-progress').style.display = 'none';
+    document.getElementById('next-stage-container').style.display = 'none';
+    document.getElementById('model-panel').style.display = 'none';
+    document.getElementById('menu-models').style.display = 'none';
+    document.getElementById('deploy-zone').style.display = 'none';
+    document.getElementById('deploy-section').style.display = 'none';
+    document.getElementById('next-stage-container').style.display = 'none';
+    document.getElementById('insight-overlay').style.display = 'none';
+    document.getElementById('deploy-grid').innerHTML = '';
+
+    document.getElementById('collect-btn').disabled = false;
+    const trainBtn = document.querySelector('.btn-train');
+    trainBtn.disabled = false;
+    trainBtn.textContent = '▶ Train';
+
+    // Hide overlays, restore intro → theme → app flow
+    localStorage.removeItem('sor-intro-seen');
+    document.getElementById('reset-overlay').style.display = 'none';
+    document.getElementById('modelset-overlay').style.display = 'none';
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('theme-overlay').style.display = 'flex';
+    document.getElementById('intro-overlay').style.display = 'flex';
   }
 </script>
 </body>
