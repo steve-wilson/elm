@@ -986,38 +986,41 @@ function cancelReveal() {
 // ── Deploy section ────────────────────────────────────────────────────────────
 function showDeploySection() {
   const el = document.getElementById('deploy-section');
-  if (el.innerHTML.trim()) { el.style.display = 'block'; return; }
   el.style.display = 'block';
-  el.innerHTML = `
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-top:16px;" id="deploy-inner">
-      <div class="section-label" style="margin-bottom:10px;">Deploy a model</div>
-      <p style="font-size:0.88rem;color:var(--muted);margin-bottom:14px;">
-        Pick the model you trust most — the one with the validation score you'd bet on:
-      </p>
-      <div id="deploy-picker" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
-      <div style="display:flex;align-items:center;gap:10px;" id="deploy-controls">
-        <button class="btn btn-next-stage" id="deploy-btn" onclick="startDeploy()">🚀 Deploy</button>
-        <button class="info-btn" onclick="showTooltip(this,event)" data-tip="deploy">i</button>
-      </div>
-      <div class="deploy-stream" id="deploy-stream" style="display:none;"></div>
-      <div id="deploy-result-section" style="display:none;">
-        <div class="deploy-compare" id="deploy-compare"></div>
-        <div id="outcome-msg"></div>
-        <div style="margin-top:16px;" id="continue-row">
-          <button class="btn btn-next-stage" id="continue-btn" onclick="goNext()">Continue →</button>
-        </div>
-      </div>
-    </div>`;
 
-  // Pre-select best locked model by test accuracy
-  const locked = mSt.map((m, i) => ({ i, testAcc: m.testAcc })).filter(x => mSt[x.i].lockedIn);
-  locked.sort((a, b) => b.testAcc - a.testAcc);
-  deployModelIdx = locked[0].i;
+  if (!el.innerHTML.trim()) {
+    el.innerHTML = `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-top:16px;" id="deploy-inner">
+        <div class="section-label" style="margin-bottom:10px;">Deploy a model</div>
+        <p style="font-size:0.88rem;color:var(--muted);margin-bottom:14px;">
+          Pick the model you trust most — the one with the validation score you'd bet on:
+        </p>
+        <div id="deploy-picker" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
+        <div style="display:flex;align-items:center;gap:10px;" id="deploy-controls">
+          <button class="btn btn-next-stage" id="deploy-btn" onclick="startDeploy()">🚀 Deploy</button>
+          <button class="info-btn" onclick="showTooltip(this,event)" data-tip="deploy">i</button>
+        </div>
+        <div class="deploy-stream" id="deploy-stream" style="display:none;"></div>
+        <div id="deploy-result-section" style="display:none;">
+          <div class="deploy-compare" id="deploy-compare"></div>
+          <div id="outcome-msg"></div>
+          <div style="margin-top:16px;" id="continue-row">
+            <button class="btn btn-next-stage" id="continue-btn" onclick="goNext()">Continue →</button>
+          </div>
+        </div>
+      </div>`;
+
+    // Pre-select best locked model by test accuracy on first open
+    const locked = mSt.map((m, i) => ({ i, testAcc: m.testAcc })).filter(x => mSt[x.i].lockedIn);
+    locked.sort((a, b) => b.testAcc - a.testAcc);
+    deployModelIdx = locked[0].i;
+
+    setPulse('deploy-btn');
+    setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+    updateBanner();
+  }
 
   renderDeployPicker();
-  setPulse('deploy-btn');
-  setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
-  updateBanner();
 }
 
 function renderDeployPicker() {
