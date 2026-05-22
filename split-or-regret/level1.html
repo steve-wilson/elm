@@ -976,7 +976,9 @@
 
       const prevBest  = allRuns.length ? Math.max(...allRuns.map(r => r.pct)) : -1;
       const isNewBest = pct > prevBest;
-      allRuns.unshift({ pct, blocks: selected.size, id: allRuns.length + 1, model: modelName, modelIdx: selectedModel });
+      if (onboardPhase >= 3) {
+        allRuns.unshift({ pct, blocks: selected.size, id: allRuns.length + 1, model: modelName, modelIdx: selectedModel });
+      }
 
       State.setLevel(1, { started: true, bestAccuracy: Math.max(acc, State.getLevel(1).bestAccuracy || 0) });
       Log.event('train_run', { level: 1, runId: allRuns.length, modelIdx: selectedModel, modelName, collected: selected.size, trainAccuracy: pct, isNewBest });
@@ -1049,11 +1051,10 @@
     tag.textContent = `#${rank + 1}`;
     el.appendChild(tag);
 
-    const displayName = MODEL_SETS[currentModelSet][run.modelIdx] ?? run.model;
-    if (displayName) {
+    if (run.model) {
       const ml = document.createElement('span');
       ml.style.cssText = 'font-size:0.8rem;font-weight:700;color:var(--accent);';
-      ml.textContent = displayName;
+      ml.textContent = run.model;
       el.appendChild(ml);
     }
 
