@@ -1049,10 +1049,11 @@
     tag.textContent = `#${rank + 1}`;
     el.appendChild(tag);
 
-    if (run.model) {
+    const displayName = MODEL_SETS[currentModelSet][run.modelIdx] ?? run.model;
+    if (displayName) {
       const ml = document.createElement('span');
       ml.style.cssText = 'font-size:0.8rem;font-weight:700;color:var(--accent);';
-      ml.textContent = run.model;
+      ml.textContent = displayName;
       el.appendChild(ml);
     }
 
