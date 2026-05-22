@@ -313,12 +313,12 @@ const MODEL_SETS = {
 };
 
 const CURVES = [
-  {base:0.52, scale:0.40, jitter:0.04, overfit:0.08},
-  {base:0.44, scale:0.52, jitter:0.04, overfit:0.12},
-  {base:0.63, scale:0.26, jitter:0.02, overfit:0.05},
-  {base:0.50, scale:0.38, jitter:0.12, overfit:0.10},
-  {base:0.40, scale:0.57, jitter:0.04, overfit:0.14},
-  {base:0.56, scale:0.36, jitter:0.03, overfit:0.07},
+  {base:0.52, scale:0.38, jitter:0.03, overfit:0.09},  // moderate train, moderate test
+  {base:0.44, scale:0.54, jitter:0.03, overfit:0.16},  // best train → worst-ish test (overfits)
+  {base:0.64, scale:0.24, jitter:0.02, overfit:0.04},  // mid train → best test (generalises well)
+  {base:0.50, scale:0.36, jitter:0.03, overfit:0.10},  // moderate throughout
+  {base:0.38, scale:0.60, jitter:0.03, overfit:0.19},  // 2nd-best train → worst test (overfits badly)
+  {base:0.58, scale:0.34, jitter:0.02, overfit:0.06},  // good train → 2nd-best test
 ];
 
 let splitPt     = 96;
@@ -553,10 +553,10 @@ function doDeploy() {
                  : ms.trained ? clamp(ms.trainAcc - curve.overfit, 0.25, 0.95)
                  : 0.50;
 
-  // Smaller test set → less reliable estimate → larger gap between test score and reality
+  // Gap scales tightly with test-set size: small test → guaranteed large gap, large test → always tiny
   const testSize      = TOTAL - splitPt;
   const unreliability = 1 - Math.sqrt(testSize / TOTAL);
-  const gap           = unreliability * (0.07 + 0.09 * Math.random());
+  const gap           = unreliability * (0.12 + 0.04 * Math.random());
   const realAcc       = clamp(baseTest - gap, 0.25, 0.95);
 
   const streamEl = document.getElementById('deploy-stream');
@@ -573,7 +573,7 @@ function doDeploy() {
   const tick = setInterval(() => {
     if (i === 30) {
       clearInterval(tick);
-      finalizeDeploy(baseTest, correct / 30);
+      finalizeDeploy(baseTest, realAcc);
       return;
     }
     const hit = Math.random() < realAcc;
@@ -604,7 +604,8 @@ function finalizeDeploy(testEst, realAcc) {
     msg.innerHTML = `✅ <strong>Close match.</strong> Your test estimate was a reliable guide — real-world performance landed right where you predicted.`;
   } else {
     msg.className = 'outcome-msg msg-bad';
-    msg.innerHTML = `⚠️ <strong>${gap > 0 ? gap + '% gap' : 'Overestimate'}.</strong> Your test estimate and real-world performance diverged. Test scores are based on a small held-out sample — a useful guide, but not a guarantee.`;
+    const gapStr = gap > 0 ? gap + '% gap' : Math.abs(gap) + '% above estimate';
+    msg.innerHTML = `⚠️ <strong>${gapStr}.</strong> Your test estimate and real-world performance diverged. Test scores are based on a small held-out sample — a useful guide, but not a guarantee.`;
   }
 
   State.setLevel(2, { completed: true, bestAccuracy: realAcc });

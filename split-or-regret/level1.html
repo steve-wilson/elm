@@ -1032,7 +1032,7 @@
   function renderHistory(isNewBest) {
     const panel = document.getElementById('history-panel');
     const list  = document.getElementById('history-list');
-    if (!allRuns.length) { panel.style.display = 'none'; return; }
+    if (!allRuns.length || onboardPhase < 3) { panel.style.display = 'none'; return; }
     panel.style.display = 'block';
     list.innerHTML = '';
     [...allRuns].sort((a, b) => b.pct - a.pct).slice(0, 3).forEach((run, rank) => {
