@@ -1,0 +1,1748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Split or Regret — Free Play</title>
+<script>
+  try {
+    const s = JSON.parse(localStorage.getItem('sor_state') || '{}');
+    document.documentElement.className = 'theme-' + (s.theme || 'clean');
+  } catch(e) {}
+</script>
+<link rel="stylesheet" href="css/shared.css">
+<style>
+  .theme-clean { --val: #6366f1; }
+  .theme-dark  { --val: #a78bfa; }
+  .theme-retro { --val: #00bfff; }
+  .theme-candy { --val: #a78bfa; }
+
+  #data-grid { display: grid; grid-template-columns: repeat(20, 1fr); gap: 4px; user-select: none; position: relative; }
+
+  .split-container {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
+  }
+  .split-zones { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .zone-lbl { font-size: 0.82rem; font-weight: 700; }
+  .zone-lbl .split-ct { font-size: 0.78rem; font-weight: 400; color: var(--muted); margin-left: 3px; }
+  .lbl-train { color: var(--train); }
+  .lbl-val   { color: var(--val); }
+  .lbl-test  { color: var(--test); display: flex; align-items: center; gap: 4px; }
+
+  .split-bar-track { display: flex; height: 5px; border-radius: 3px; overflow: hidden; margin-bottom: 10px; gap: 2px; }
+  .split-bar-seg { transition: flex 0.15s ease; min-width: 0; }
+  #bar-train { background: var(--train); }
+  #bar-val   { background: var(--val); }
+  #bar-test  { background: var(--test); opacity: 0.5; }
+
+  .split-hint { text-align: center; font-size: 0.78rem; color: var(--muted); margin-top: 8px; }
+
+  /* Dual-handle split slider */
+  .dual-range-wrap {
+    position: relative; height: 26px; margin: 4px 0 8px;
+    display: flex; align-items: center;
+  }
+  .dual-range-wrap input[type="range"] {
+    position: absolute; left: 0; right: 0; width: 100%;
+    pointer-events: none; -webkit-appearance: none; appearance: none;
+    background: transparent; height: 4px; margin: 0; outline: none;
+    border: none; padding: 0;
+  }
+  .dual-range-wrap input[type="range"]::-webkit-slider-thumb {
+    pointer-events: all; -webkit-appearance: none;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--accent); cursor: pointer;
+    border: 2px solid var(--surface); box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+    transition: box-shadow 0.15s;
+  }
+  .dual-range-wrap input[type="range"]::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 0 4px var(--pulse-ring);
+  }
+  .dual-range-wrap input[type="range"]::-moz-range-thumb {
+    pointer-events: all; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--accent); cursor: pointer;
+    border: 2px solid var(--surface); box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  }
+  .dual-range-wrap input[type="range"]::-webkit-slider-runnable-track { background: transparent; }
+  .dual-range-wrap input[type="range"]::-moz-range-track { background: transparent; }
+  .dual-range-wrap input[type="range"]:disabled { pointer-events: none; }
+  .dual-range-wrap input[type="range"]:disabled::-webkit-slider-thumb { opacity: 0.4; cursor: default; }
+  .dual-range-wrap input[type="range"]:disabled::-moz-range-thumb { opacity: 0.4; cursor: default; }
+  /* Right thumb sits above left thumb so both are reachable when they're close */
+  #slider-test { z-index: 2; }
+
+  #data-grid .block { aspect-ratio: 1; overflow: hidden; border-radius: 2px; }
+  #data-grid .block.train { background: transparent; color: var(--train); }
+  #data-grid .block.val   { background: transparent; color: var(--val); }
+  #data-grid .block.test  { background: transparent; color: var(--test); opacity: 0.38; }
+
+  .model-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+  .hp-slider-row { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+  .hp-name { font-size: 0.82rem; font-weight: 600; color: var(--muted); flex-shrink: 0; width: 150px; }
+  .hp-slider { flex: 1; accent-color: var(--val); cursor: pointer; }
+  .hp-slider:disabled { opacity: 0.45; cursor: default; }
+  .hp-val { font-size: 0.82rem; font-weight: 700; width: 28px; text-align: right; }
+
+  .prog-bg { margin-top: 8px; background: var(--border); border-radius: 6px; overflow: hidden; height: 12px; }
+  #prog-fill { height: 100%; background: var(--train); border-radius: 6px; width: 0%; transition: width 0.1s linear; }
+
+  .val-bar-fill { background: var(--val) !important; }
+
+  .train-sweep {
+    position: absolute; top: 0; bottom: 0; width: 22%;
+    background: linear-gradient(90deg, transparent, var(--sweep-color) 50%, transparent);
+    pointer-events: none; z-index: 2; animation: train-sweep-anim ease-in-out forwards;
+  }
+  @keyframes train-sweep-anim { from { left: -22%; } to { left: 105%; } }
+
+  .dp-block { aspect-ratio:1; border-radius:2px; background:var(--border); transition:background 0.08s; }
+  .dp-block.correct { background:var(--train); }
+  .dp-block.wrong   { background:var(--test); opacity:0.65; }
+
+  /* Credits */
+  .credits-badge {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 5px 12px; font-size: 0.85rem;
+  }
+  .credits-badge .credits-label { color: var(--muted); }
+  .credits-badge .credits-num { font-weight: 800; font-size: 1.05rem; color: var(--accent); transition: color 0.3s; }
+  .credits-badge.low  .credits-num { color: var(--test); }
+  .credits-badge.zero .credits-num { color: var(--test); }
+
+  /* Dataset selector */
+  .dataset-selector {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 20px; margin-bottom: 16px;
+  }
+  .ds-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .ds-btn {
+    padding: 7px 14px; border: 2px solid var(--border); border-radius: var(--radius);
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s;
+  }
+  .ds-btn:hover:not(:disabled) { border-color: var(--accent); }
+  .ds-btn.active { border-color: var(--accent); background: var(--accent); color: white; }
+  .ds-btn:disabled { opacity: 0.38; cursor: not-allowed; }
+  .ds-desc { font-size: 0.88rem; color: var(--muted); margin-top: 10px; line-height: 1.5; }
+  .ds-note {
+    margin-top: 8px; padding: 8px 12px;
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--surface));
+    border-radius: calc(var(--radius) / 1.5); font-size: 0.82rem; color: var(--text);
+  }
+
+
+  #menu-btn {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    cursor: pointer; padding: 6px 10px; border-radius: var(--radius);
+    font-size: 1rem; line-height: 1; font-family: var(--font);
+  }
+  #menu-btn:hover { color: var(--text); border-color: var(--accent); }
+  #menu-dropdown {
+    display: none; position: absolute; right: 0; top: calc(100% + 6px);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); min-width: 160px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15); z-index: 50; overflow: hidden;
+  }
+  #menu-dropdown.open { display: block; }
+
+  /* ── Leaderboard ── */
+  .lb-row {
+    display: grid;
+    grid-template-columns: 26px minmax(60px, 1fr) 65px 48px 90px;
+    gap: 8px; align-items: center;
+    padding: 6px 10px; margin-bottom: 4px;
+    border-radius: calc(var(--radius) / 1.5);
+    border: 1px solid var(--border); background: var(--bg);
+    font-size: 0.80rem; transition: opacity 0.25s, border-color 0.2s, background 0.2s;
+  }
+  .lb-row.untrained { opacity: 0.35; }
+  .lb-row.is-locked {
+    border-color: var(--val);
+    background: color-mix(in srgb, var(--val) 7%, var(--bg));
+  }
+  .lb-rank { font-size: 0.7rem; font-weight: 700; color: var(--muted); }
+  .lb-name { font-weight: 700; }
+  .lb-hps  { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+  .lb-val  { font-weight: 700; color: var(--val); text-align: right; }
+  .lb-test { display: flex; justify-content: flex-end; align-items: center; }
+  .reveal-btn {
+    padding: 3px 9px; border: 1px solid var(--border); border-radius: calc(var(--radius) / 2);
+    background: none; color: var(--muted); font-family: var(--font);
+    font-size: 0.72rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .reveal-btn:hover { border-color: var(--val); color: var(--val); }
+  .test-score { font-weight: 700; font-size: 0.85rem; }
+  .test-score.good { color: var(--train); }
+  .test-score.ok   { color: var(--accent); }
+  .test-score.bad  { color: var(--test); }
+  .lb-dash { color: var(--muted); font-size: 0.82rem; }
+
+  /* ── Two-column leaderboard grid ── */
+  #lb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* ── Per-model run history ── */
+  .mhist-row {
+    display: grid;
+    grid-template-columns: 20px 1fr 40px 40px;
+    gap: 5px; align-items: center;
+    padding: 5px 8px; margin-bottom: 4px;
+    border-radius: calc(var(--radius) / 1.5);
+    border: 1px solid var(--border); background: var(--bg);
+  }
+  .mhist-row.mhist-header {
+    background: none; border-color: transparent;
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--muted);
+    padding-bottom: 2px; margin-bottom: 0;
+  }
+  .mhist-row.mhist-header div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mhist-row:not(.mhist-header):hover { border-color: var(--accent); }
+  .mhist-row.best     { border-color: var(--val); background: color-mix(in srgb, var(--val) 7%, var(--bg)); }
+  .mhist-row.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--bg)); }
+  .mhist-rank  { font-size: 0.7rem; font-weight: 700; color: var(--muted); }
+  .mhist-hpval { font-size: 0.8rem; font-weight: 700; }
+  .mhist-acc   { font-size: 0.8rem; font-weight: 700; text-align: right; }
+  .mhist-train { color: var(--train); }
+  .mhist-val   { color: var(--val); }
+
+  /* ── Compact split after lock ── */
+  #split-container.locked #data-grid    { display: none; }
+  #split-container.locked .dual-range-wrap { display: none; }
+  #split-container.locked .split-hint   { margin-top: 2px; font-size: 0.76rem; }
+
+  .charts-row { display: flex; gap: 12px; align-items: flex-start; }
+  .hp-acc-row  { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 16px; }
+  .hp-acc-row > #hp-panel { flex: 0 0 auto; width: 52%; }
+  @media (max-width: 700px) {
+    #lb-grid { grid-template-columns: 1fr; }
+    .charts-row  { flex-direction: column; }
+    .hp-acc-row  { flex-direction: column; }
+    .hp-acc-row > #hp-panel { width: 100%; }
+  }
+  @media (max-width: 600px) {
+    .hp-name { width: 110px; font-size: 0.78rem; }
+    #data-grid { grid-template-columns: repeat(10, 1fr); }
+    .ds-btn { font-size: 0.76rem; padding: 6px 10px; }
+    .lb-row { grid-template-columns: 22px 1fr auto 42px auto; gap: 6px; padding: 8px 10px; }
+    .lb-hps { display: none; }
+  }
+  @media (max-width: 480px) {
+    .split-zones { flex-wrap: wrap; gap: 6px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Theme overlay -->
+<div class="overlay" id="theme-overlay" style="display:none;">
+  <div class="picker-card">
+    <h1>Pick your theme</h1>
+    <p>You can change this any time from the header.</p>
+    <div class="picker-options">
+      <button class="picker-btn" onclick="pickTheme('clean')"><div class="swatch swatch-clean"></div>Clean</button>
+      <button class="picker-btn" onclick="pickTheme('dark')"><div class="swatch swatch-dark"></div>Dark</button>
+      <button class="picker-btn" onclick="pickTheme('retro')"><div class="swatch swatch-retro"></div>Retro</button>
+      <button class="picker-btn" onclick="pickTheme('candy')"><div class="swatch swatch-candy"></div>Candy</button>
+    </div>
+  </div>
+</div>
+
+<!-- Model set overlay -->
+<div class="overlay" id="model-overlay" style="display:none;">
+  <div class="picker-card">
+    <h1>Choose model names</h1>
+    <p>You can switch this any time from the header.</p>
+    <div class="picker-options">
+      <button class="picker-btn" onclick="pickModelSet('greek')"><div style="font-size:1.1rem;margin-bottom:4px;">α β γ δ ε ζ</div>Greek letters</button>
+      <button class="picker-btn" onclick="pickModelSet('animals')"><div style="font-size:1.1rem;margin-bottom:4px;">🦊🐺🐻🦅🦈🐯</div>Animals</button>
+      <button class="picker-btn" onclick="pickModelSet('zodiac')"><div style="font-size:1.1rem;margin-bottom:4px;">♈♉♊♋♌♍</div>Zodiac</button>
+      <button class="picker-btn" onclick="pickModelSet('realistic')"><div style="font-size:0.78rem;font-weight:700;margin-bottom:4px;">SVM · RF · GB · NN</div>Real names</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reset confirmation -->
+<div class="overlay" id="reset-overlay" style="display:none;">
+  <div class="picker-card" style="max-width:380px;">
+    <h1 style="font-size:1.2rem;margin-bottom:10px;">Reset this dataset?</h1>
+    <p style="margin-bottom:24px;">This clears all runs and resets the compute budget for this dataset. Your high scores are kept.</p>
+    <div style="display:flex;gap:12px;justify-content:center;">
+      <button onclick="doReset()" style="padding:10px 28px;background:#ef4444;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;">Yes, reset</button>
+      <button onclick="document.getElementById('reset-overlay').style.display='none'" style="padding:10px 28px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reveal test confirmation -->
+<div class="overlay" id="reveal-overlay" style="display:none;">
+  <div class="picker-card" style="max-width:400px;">
+    <h1 style="font-size:1.15rem;margin-bottom:10px;">Lock in this model?</h1>
+    <p style="margin-bottom:8px;">You're about to lock in <strong id="reveal-model-name"></strong> and reveal its test score.</p>
+    <p style="margin-bottom:24px;font-size:0.9rem;color:#6b7280;">This is <strong>irreversible</strong> for this model. Make sure you're satisfied with its validation score first.</p>
+    <div style="display:flex;gap:12px;justify-content:center;">
+      <button onclick="confirmReveal()" style="padding:10px 24px;background:#6366f1;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;">Lock in</button>
+      <button onclick="cancelReveal()" style="padding:10px 24px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Main app -->
+<div id="app">
+  <header>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <h1>Free Play</h1>
+      <span class="level-badge" id="ds-badge">The Warm-Up</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <a href="done.html" class="header-btn" style="text-decoration:none;">← Back</a>
+      <div style="position:relative;">
+        <button id="menu-btn" onclick="toggleMenu()">&#9776;</button>
+        <div id="menu-dropdown">
+          <button class="menu-item" onclick="menuAction('theme')">⚙ Theme</button>
+          <button class="menu-item" onclick="menuAction('models')">⚙ Model Names</button>
+          <hr class="menu-divider">
+          <button class="menu-item danger" onclick="menuAction('reset')">↺ Reset Dataset</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Dataset selector -->
+    <div class="dataset-selector">
+      <div class="section-label">Dataset</div>
+      <div class="ds-row" id="ds-row"></div>
+      <div class="ds-desc" id="ds-desc"></div>
+      <div id="ds-note" style="display:none;" class="ds-note"></div>
+      <div style="margin-top:10px;font-size:0.84rem;color:var(--muted);">
+        Goal: beat <strong id="competitor-score" style="color:var(--accent);font-size:1rem;"></strong>% val accuracy to win ⭐
+      </div>
+    </div>
+
+    <!-- Split visualization -->
+    <div class="split-container" id="split-container">
+      <div class="split-zones">
+        <span class="zone-lbl lbl-train">Train <span class="split-ct" id="train-ct"></span></span>
+        <span class="zone-lbl lbl-val">Val <span class="split-ct" id="val-ct"></span></span>
+        <span class="zone-lbl lbl-test">
+          <svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor" style="flex-shrink:0;">
+            <rect x="1" y="5" width="8" height="7" rx="1"/>
+            <path d="M3 5V3.5a2 2 0 0 1 4 0V5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+          Test <span class="split-ct" id="test-ct"></span>
+        </span>
+      </div>
+      <div class="split-bar-track">
+        <div class="split-bar-seg" id="bar-train"></div>
+        <div class="split-bar-seg" id="bar-val"></div>
+        <div class="split-bar-seg" id="bar-test"></div>
+      </div>
+      <div class="dual-range-wrap">
+        <input type="range" id="slider-train" min="0" max="80" value="56" step="1">
+        <input type="range" id="slider-test"  min="0" max="80" value="68" step="1">
+      </div>
+      <div id="data-grid" style="position:relative;"></div>
+      <div class="split-hint" id="split-hint">
+        Drag to adjust the train / validation split — test is always held out
+      </div>
+    </div>
+
+    <!-- Model + HP + Train  /  Progress + Accuracy  (side by side) -->
+    <div class="hp-acc-row">
+      <div id="hp-panel" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+        <div class="section-label" style="margin-bottom:8px;">Choose a model</div>
+        <div class="model-row" id="model-buttons"></div>
+        <div style="border-top:1px solid var(--border);margin-top:14px;padding-top:14px;">
+          <div class="section-label" id="hp-panel-label" style="margin-bottom:0;">Hyperparameters</div>
+          <div id="hp-sliders"></div>
+        </div>
+        <div id="hp-locked-msg" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:0.82rem;color:var(--muted);">
+          🔒 Locked in — test score revealed. Select another model to keep exploring.
+        </div>
+      </div>
+
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:0;">
+        <!-- Train button (hidden during training) -->
+        <div id="train-btn-wrap" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <button class="btn btn-train" id="train-btn" onclick="doTrain()">▶ Train</button>
+            <span id="credits-warning" style="font-size:0.82rem;color:var(--test);display:none;">
+              No credits remaining — deploy with what you have.
+            </span>
+          </div>
+          <div class="credits-badge" id="credits-badge">
+            <span class="credits-label">Credits</span>
+            <span class="credits-num" id="credits-num">20</span>
+          </div>
+        </div>
+
+        <!-- Progress panel -->
+        <div id="progress-panel" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+          <div class="section-label" id="prog-label">Training…</div>
+          <div class="prog-bg"><div id="prog-fill"></div></div>
+          <div id="prog-text" style="margin-top:6px;font-size:0.82rem;color:var(--muted);"></div>
+        </div>
+
+        <!-- Accuracy panel -->
+        <div id="accuracy-panel" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+          <div class="section-label" style="margin-bottom:2px;">
+            Performance — <span id="acc-model-label" style="text-transform:none;font-weight:700;color:var(--text);"></span>
+          </div>
+          <div class="accuracy-row">
+            <div class="accuracy-label">Train accuracy</div>
+            <div class="accuracy-bar-bg"><div class="accuracy-bar" id="train-bar" style="width:0%"></div></div>
+            <div class="accuracy-pct" id="train-pct">—</div>
+          </div>
+          <div class="accuracy-row" style="margin-top:6px;">
+            <div class="accuracy-label" style="color:var(--val);">Val accuracy</div>
+            <div class="accuracy-bar-bg"><div class="accuracy-bar val-bar-fill" id="val-bar" style="width:0%"></div></div>
+            <div class="accuracy-pct" id="val-pct" style="color:var(--val);">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div id="leaderboard-panel" style="display:none;margin-top:16px;">
+      <div id="lb-grid">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+          <div class="section-label" id="mhist-label" style="margin-bottom:10px;">Runs</div>
+          <div id="model-history"></div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;">
+            <div class="section-label" style="margin-bottom:0;">Leaderboard</div>
+            <span style="font-size:0.78rem;color:var(--muted);">
+              Your best: <strong id="high-score" style="color:var(--train);">—</strong>
+              &nbsp;·&nbsp; Beat <strong style="color:var(--text);" id="competitor-score-lb"></strong>% to win ⭐
+            </span>
+          </div>
+          <div style="display:grid;grid-template-columns:26px minmax(60px,1fr) 65px 48px 90px;gap:8px;padding:0 12px 6px;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">
+            <div></div><div>Model</div><div>HPs</div>
+            <div style="text-align:right;">Val</div>
+            <div style="text-align:right;">Test</div>
+          </div>
+          <div id="leaderboard"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts section -->
+    <div id="charts-section" style="display:none;margin-top:16px;">
+      <div class="charts-row">
+        <div style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+          <div class="section-label" id="chart-a-label" style="margin-bottom:10px;">HP Map</div>
+          <svg id="chart-a" width="100%" style="display:block;" preserveAspectRatio="xMidYMid meet"></svg>
+          <div id="chart-a-legend" style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:0.72rem;color:var(--muted);"></div>
+        </div>
+        <div style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+          <div class="section-label" style="margin-bottom:10px;">All Models — Runs</div>
+          <svg id="chart-b" width="100%" style="display:block;" preserveAspectRatio="xMidYMid meet"></svg>
+          <div id="chart-b-legend"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Deploy section (hidden until Step 5) -->
+    <div id="deploy-section" style="display:none;"></div>
+
+  </main>
+</div>
+
+<div id="tooltip"></div>
+
+<script src="js/state.js"></script>
+<script src="js/log.js"></script>
+<script src="js/themes.js"></script>
+<script>
+// ── Dataset config ─────────────────────────────────────────────────────────────
+// Internal challenge concepts are comments only — not shown to students.
+const DATASETS = [
+  { // internal: warm-up / clean balanced
+    id: 1,
+    name: 'Dataset 1',
+    description: 'A standard dataset to get you oriented with the free play interface.',
+    total: 80,
+    budget: 20, creditMultiplier: 0.5,
+    specialBonus: null, competitorScore: 78,
+    jitterMult: 1.0, overfitMult: 1.0, note: null,
+  },
+  { // internal: tiny dataset — non-standard splits win
+    id: 2,
+    name: 'Dataset 2',
+    description: 'A smaller collection. Choose your split carefully.',
+    total: 40,
+    budget: 12, creditMultiplier: 1.0,
+    specialBonus: null, competitorScore: 72,
+    jitterMult: 1.0, overfitMult: 1.0,
+    note: 'You only have 40 points to work with.',
+  },
+  { // internal: class imbalance — 85/15 train, 60/40 real-world
+    id: 3,
+    name: 'Dataset 3',
+    description: 'A real-world collection with uneven class distribution.',
+    total: 90,
+    budget: 15, creditMultiplier: 0.5,
+    specialBonus: 'imbalance', competitorScore: 80,
+    jitterMult: 1.0, overfitMult: 1.0, note: null,
+  },
+  { // internal: high variance / noisy — stable models win
+    id: 4,
+    name: 'Dataset 4',
+    description: 'A challenging collection. Train carefully and observe your results.',
+    total: 80,
+    budget: 10, creditMultiplier: 2.0,
+    specialBonus: null, competitorScore: 74,
+    jitterMult: 3.2, overfitMult: 1.0, note: null,
+  },
+  { // internal: overfitting trap — val peaks then drops with high HP1
+    id: 5,
+    name: 'Dataset 5',
+    description: 'A clean collection. Tune your models and trust what the data tells you.',
+    total: 100,
+    budget: 15, creditMultiplier: 1.0,
+    specialBonus: null, competitorScore: 76,
+    jitterMult: 1.0, overfitMult: 2.6, note: null,
+  },
+];
+
+// ── Model & HP config (same as level3) ────────────────────────────────────────
+const MODEL_NAMES = {
+  greek:     ['α','β','γ','δ','ε','ζ'],
+  animals:   ['🦊','🐺','🐻','🦅','🦈','🐯'],
+  zodiac:    ['♈','♉','♊','♋','♌','♍'],
+  realistic: ['SVM','RandForest','GradBoost','NeuralNet','KNN','NaiveBayes'],
+};
+
+const HP_CONFIG = [
+  { greek:    { hp1:'Magnitude',          hp2:'Convergence'      },
+    animals:  { hp1:'Cunning',            hp2:'Agility'          },
+    zodiac:   { hp1:'Intensity',          hp2:'Impulsiveness'    },
+    realistic:{ hp1:'Regularization (C)', hp2:'Kernel Width (γ)' } },
+  { greek:    { hp1:'Sensitivity',        hp2:'Threshold'        },
+    animals:  { hp1:'Pack Size',          hp2:'Aggression'       },
+    zodiac:   { hp1:'Stubbornness',       hp2:'Patience'         },
+    realistic:{ hp1:'Trees',              hp2:'Max Depth'        } },
+  { greek:    { hp1:'Curvature',          hp2:'Decay'            },
+    animals:  { hp1:'Hibernation',        hp2:'Foraging Range'   },
+    zodiac:   { hp1:'Adaptability',       hp2:'Inconsistency'    },
+    realistic:{ hp1:'Learning Rate',      hp2:'Estimators'       } },
+  { greek:    { hp1:'Step Size',          hp2:'Momentum'         },
+    animals:  { hp1:'Wingspan',           hp2:'Dive Speed'       },
+    zodiac:   { hp1:'Intuition',          hp2:'Sensitivity'      },
+    realistic:{ hp1:'Learning Rate',      hp2:'Hidden Layers'    } },
+  { greek:    { hp1:'Tolerance',          hp2:null },
+    animals:  { hp1:'Bite Force',         hp2:null },
+    zodiac:   { hp1:'Confidence',         hp2:null },
+    realistic:{ hp1:'K (Neighbors)',      hp2:null } },
+  { greek:    { hp1:'Amplitude',          hp2:null },
+    animals:  { hp1:'Ferocity',           hp2:null },
+    zodiac:   { hp1:'Precision',          hp2:null },
+    realistic:{ hp1:'Smoothing (α)',      hp2:null } },
+];
+
+// base, hp1TrainBoost, hp1sweet, hp1OverfitMax, hp2sweet, hp2PenaltyMax, jitter
+const CURVES = [
+  { base:0.66, hp1TrainBoost:0.36, hp1sweet:48, hp1OverfitMax:0.42, hp2sweet:25, hp2PenaltyMax:0.24, jitter:0.028 },
+  { base:0.62, hp1TrainBoost:0.32, hp1sweet:62, hp1OverfitMax:0.22, hp2sweet:72, hp2PenaltyMax:0.18, jitter:0.035 },
+  { base:0.65, hp1TrainBoost:0.55, hp1sweet:22, hp1OverfitMax:0.55, hp2sweet:62, hp2PenaltyMax:0.26, jitter:0.040 },
+  { base:0.64, hp1TrainBoost:0.42, hp1sweet:42, hp1OverfitMax:0.38, hp2sweet:75, hp2PenaltyMax:0.22, jitter:0.045 },
+  { base:0.69, hp1TrainBoost:0.45, hp1sweet:15, hp1OverfitMax:0.65, jitter:0.030 },
+  { base:0.72, hp1TrainBoost:0.24, hp1sweet:52, hp1OverfitMax:0.30, jitter:0.020 },
+];
+
+// ── Freeplay persistent storage ───────────────────────────────────────────────
+const FP_KEY = 'sor_freeplay';
+
+function fpLoad() {
+  try { return JSON.parse(localStorage.getItem(FP_KEY) || '{}'); } catch { return {}; }
+}
+function fpSave(d) { localStorage.setItem(FP_KEY, JSON.stringify(d)); }
+function fpGet(key, def) { const d = fpLoad(); return (d[key] !== undefined && d[key] !== null) ? d[key] : def; }
+function fpSet(key, val) { const d = fpLoad(); d[key] = val; fpSave(d); }
+
+// ── Session state ─────────────────────────────────────────────────────────────
+let curDatasetId  = 1;
+let trainPt       = 56;   // blocks in train
+let testStartPt   = 68;   // blocks in train+val (where test begins)
+let splitLocked   = false;
+let selModel      = 0;        // display index (0-5)
+let busy          = false;
+let credits       = 20;
+// modelOrder[displayIdx] = curveIdx — shuffled per session so memorizing curves doesn't work
+let modelOrder    = [0,1,2,3,4,5];
+let pendingRevealIdx = -1;
+let deployedIdx      = -1;
+
+const MIN_TRAIN = 6;
+const MIN_VAL   = 4;
+const MIN_TEST  = 4;
+
+const mSt = Array.from({length: 6}, () => ({
+  hp1:50, hp2:50,
+  trained:false, lockedIn:false,
+  trainAcc:null, valAcc:null, testAcc:null,
+  lockedHp1:null, lockedHp2:null,
+  runs:[],
+}));
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function ds()           { return DATASETS.find(d => d.id === curDatasetId); }
+function getModelSet()  { return State.get('modelSet') || 'greek'; }
+function getLabels()    { return MODEL_NAMES[getModelSet()]; }
+function clamp(v,lo,hi) { return Math.min(hi, Math.max(lo, v)); }
+function fmtPct(v)      { return Math.round(v * 100) + '%'; }
+function hasHp2(displayIdx) { return HP_CONFIG[displayIdx][getModelSet()].hp2 !== null; }
+
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ── Accuracy computation ──────────────────────────────────────────────────────
+function computeAccuracy(displayIdx, hp1, hp2) {
+  const curveIdx = modelOrder[displayIdx];
+  const c   = CURVES[curveIdx];
+  const cfg = ds();
+  const jm  = cfg.jitterMult  || 1;
+  const om  = cfg.overfitMult || 1;
+  const hp1n = hp1 / 100;
+
+  const trainBoost = Math.min(trainPt, 75) / 75 * 0.13;
+  const rawTrain = c.base + trainBoost + hp1n * c.hp1TrainBoost;
+  const trainAcc = clamp(rawTrain + c.jitter * jm * (Math.random() - 0.5), 0.40, 0.97);
+
+  const sp     = c.hp1sweet / 100;
+  const excess = Math.max(0, (hp1n - sp) / (1 - sp + 0.001));
+  const overP  = excess * excess * c.hp1OverfitMax * om;
+
+  let hp2P = 0;
+  if (hp2 !== null && c.hp2sweet !== undefined) {
+    const dist = Math.abs(hp2/100 - c.hp2sweet/100) / 0.5;
+    hp2P = Math.min(1, dist) * c.hp2PenaltyMax;
+  }
+
+  const baseGap = 0.04 + (1 - trainPt / cfg.total) * 0.02;
+  const valAcc  = clamp(
+    trainAcc - baseGap - overP - hp2P + c.jitter * jm * (Math.random() - 0.5),
+    0.33, trainAcc
+  );
+  return { trainAcc, valAcc };
+}
+
+function computeTestAcc(valAcc) {
+  const valPt = testStartPt - trainPt;
+  const noise = 0.18 / Math.sqrt(Math.max(valPt, 2));
+  return clamp(valAcc + (Math.random() - 0.5) * 2 * noise, 0.33, 0.97);
+}
+
+// Real-world accuracy — depends on dataset characteristics
+function computeRealWorldAcc(testAcc) {
+  const cfg = ds();
+  let base = testAcc;
+  if (cfg.id === 3) {
+    // Class imbalance: real world is 60/40 but training was 85/15
+    // Model likely over-optimised for Class A, so real-world is worse
+    const imbalancePenalty = 0.05 + Math.random() * 0.10;
+    base = clamp(testAcc - imbalancePenalty, 0.33, 0.97);
+  }
+  const noise = (Math.random() - 0.5) * 0.10;
+  return clamp(
+    base + noise,
+    Math.max(0.33, base - 0.05),
+    Math.min(0.97, base + 0.05)
+  );
+}
+
+// ── SVG block ─────────────────────────────────────────────────────────────────
+const SVG_A = `<svg viewBox="0 0 10 10"><rect class="block-fill" width="10" height="10"/></svg>`;
+
+// ── Grid ──────────────────────────────────────────────────────────────────────
+function renderGrid() {
+  const total = ds().total;
+  const g     = document.getElementById('data-grid');
+  g.innerHTML = '';
+  for (let i = 0; i < total; i++) {
+    const zone = i < trainPt ? 'train' : i < testStartPt ? 'val' : 'test';
+    const b = document.createElement('div');
+    b.className = 'block ' + zone;
+    b.innerHTML = SVG_A;
+    g.appendChild(b);
+  }
+}
+
+// ── Split UI ──────────────────────────────────────────────────────────────────
+function updateSplitUI() {
+  const valPt  = testStartPt - trainPt;
+  const testPt = ds().total - testStartPt;
+  document.getElementById('train-ct').textContent = '(' + trainPt + ')';
+  document.getElementById('val-ct').textContent   = '(' + valPt   + ')';
+  document.getElementById('test-ct').textContent  = '(' + testPt  + ')';
+  document.getElementById('bar-train').style.flex = String(trainPt);
+  document.getElementById('bar-val').style.flex   = String(valPt);
+  document.getElementById('bar-test').style.flex  = String(testPt);
+}
+
+function lockSplit() {
+  splitLocked = true;
+  document.getElementById('slider-train').disabled = true;
+  document.getElementById('slider-test').disabled  = true;
+  document.getElementById('split-hint').textContent = '🔒 Split locked';
+  document.getElementById('split-container').classList.add('locked');
+}
+
+// ── Credits ───────────────────────────────────────────────────────────────────
+function updateCreditsUI() {
+  const badge = document.getElementById('credits-badge');
+  document.getElementById('credits-num').textContent = credits;
+  badge.className = 'credits-badge' + (credits === 0 ? ' zero' : credits <= 3 ? ' low' : '');
+
+  const warning  = document.getElementById('credits-warning');
+  const trainBtn = document.getElementById('train-btn');
+  if (credits <= 0) {
+    trainBtn.disabled = true;
+    warning.style.display = '';
+  } else {
+    warning.style.display = 'none';
+    if (!busy && !mSt[selModel].lockedIn) trainBtn.disabled = false;
+  }
+}
+
+// ── Dataset selector ──────────────────────────────────────────────────────────
+function renderDatasetSelector() {
+  const row    = document.getElementById('ds-row');
+  const cfg    = ds();
+  const ds1ok  = fpGet('dataset1Completed', false);
+  const scores = fpGet('highScores', {});
+
+  row.innerHTML = '';
+  DATASETS.forEach(d => {
+    const btn      = document.createElement('button');
+    const isActive = d.id === curDatasetId;
+    const isLocked = d.id !== 1 && !ds1ok;
+    const hs       = scores[d.id];
+    const star     = (hs !== undefined && hs !== null && hs >= d.competitorScore) ? ' ⭐' : '';
+    btn.className  = 'ds-btn' + (isActive ? ' active' : '');
+    btn.disabled   = isLocked;
+    btn.textContent = d.name + (isLocked ? ' 🔒' : star);
+    btn.onclick     = () => { if (!isLocked) switchDataset(d.id); };
+    row.appendChild(btn);
+  });
+
+  document.getElementById('ds-desc').textContent = cfg.description;
+  document.getElementById('ds-badge').textContent = cfg.name;
+
+  const noteEl = document.getElementById('ds-note');
+  if (cfg.note) {
+    noteEl.textContent  = cfg.note;
+    noteEl.style.display = 'block';
+  } else {
+    noteEl.style.display = 'none';
+  }
+
+  const scores2 = fpGet('highScores', {});
+  const hs = scores2[curDatasetId];
+  document.getElementById('competitor-score').textContent    = cfg.competitorScore;
+  const lbCs = document.getElementById('competitor-score-lb');
+  if (lbCs) lbCs.textContent = cfg.competitorScore;
+  document.getElementById('high-score').textContent = (hs !== undefined && hs !== null) ? hs : '—';
+}
+
+function switchDataset(id) {
+  if (id === curDatasetId) return;
+  curDatasetId = id;
+  initSession();
+}
+
+// ── Session init ──────────────────────────────────────────────────────────────
+function initSession() {
+  const cfg = ds();
+  modelOrder = shuffleArray([0,1,2,3,4,5]);
+
+  // Default: ~33% train, ~33% val, ~33% test
+  trainPt     = Math.round(cfg.total * 0.33);
+  testStartPt = Math.round(cfg.total * 0.67);
+  splitLocked = false;
+  selModel    = 0;
+  busy        = false;
+  credits          = cfg.budget;
+  pendingRevealIdx = -1;
+  deployedIdx      = -1;
+
+  mSt.forEach(m => Object.assign(m, {
+    hp1:50, hp2:50, trained:false, lockedIn:false,
+    trainAcc:null, valAcc:null, testAcc:null,
+    lockedHp1:null, lockedHp2:null, runs:[],
+  }));
+
+  const sliderTrain = document.getElementById('slider-train');
+  const sliderTest  = document.getElementById('slider-test');
+  sliderTrain.min = 0; sliderTrain.max = cfg.total; sliderTrain.value = trainPt;     sliderTrain.disabled = false;
+  sliderTest.min  = 0; sliderTest.max  = cfg.total; sliderTest.value  = testStartPt; sliderTest.disabled  = false;
+
+  document.getElementById('split-container').classList.remove('locked');
+  document.getElementById('split-hint').textContent =
+    'Drag to adjust the train / validation split — test is always held out';
+  clearAccuracyPanel();
+  document.getElementById('progress-panel').style.display    = 'none';
+  document.getElementById('train-btn-wrap').style.display    = 'flex';
+  document.getElementById('leaderboard-panel').style.display = 'none';
+  document.getElementById('charts-section').style.display    = 'none';
+  document.getElementById('deploy-section').style.display    = 'none';
+  document.getElementById('deploy-section').innerHTML        = '';
+  document.getElementById('train-btn').disabled              = false;
+  document.getElementById('credits-warning').style.display   = 'none';
+
+  renderDatasetSelector();
+  renderGrid();
+  updateSplitUI();
+  renderModelBtns();
+  renderHpPanel();
+  updateCreditsUI();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── Model buttons ─────────────────────────────────────────────────────────────
+function renderModelBtns() {
+  const labels = getLabels();
+  const c      = document.getElementById('model-buttons');
+  c.innerHTML  = '';
+  labels.forEach((lbl, i) => {
+    const btn     = document.createElement('button');
+    const locked  = mSt[i].lockedIn;
+    btn.className = 'model-btn' + (i === selModel ? ' active' : '') + (mSt[i].trained ? ' tried' : '');
+    btn.onclick   = () => selectModel(i);
+    btn.innerHTML = lbl + (locked ? ' <span style="font-size:0.65rem;opacity:0.6;">🔒</span>' : '');
+    c.appendChild(btn);
+  });
+}
+
+function selectModel(i) {
+  selModel = i;
+  renderModelBtns();
+  renderHpPanel();
+  if (mSt[i].trained) showAccuracyFor(i);
+  else clearAccuracyPanel(i);
+  renderModelHistory();
+  renderChartA();
+  renderChartB();
+}
+
+// ── HP panel ──────────────────────────────────────────────────────────────────
+function renderHpPanel() {
+  const ms     = mSt[selModel];
+  const set    = getModelSet();
+  const cfg    = HP_CONFIG[selModel][set];
+  const locked = ms.lockedIn;
+  const label  = getLabels()[selModel];
+
+  document.getElementById('hp-panel-label').textContent = label + ' — Hyperparameters';
+  document.getElementById('hp-locked-msg').style.display = locked ? 'block' : 'none';
+
+  if (credits <= 0 || locked) {
+    document.getElementById('train-btn').disabled = true;
+  } else if (!busy) {
+    document.getElementById('train-btn').disabled = false;
+  }
+
+  const container = document.getElementById('hp-sliders');
+  container.innerHTML = '';
+
+  const hp1val = locked ? ms.lockedHp1 : ms.hp1;
+  container.appendChild(makeHpRow('hp1', cfg.hp1, hp1val, locked));
+
+  // Always render second row to keep panel height stable; hide it when unused
+  const hp2val = locked ? ms.lockedHp2 : ms.hp2;
+  const hp2row = makeHpRow('hp2', cfg.hp2 || '—', hp2val, locked || cfg.hp2 === null);
+  if (cfg.hp2 === null) hp2row.style.visibility = 'hidden';
+  container.appendChild(hp2row);
+}
+
+function makeHpRow(key, name, value, locked) {
+  const row = document.createElement('div');
+  row.className = 'hp-slider-row';
+
+  const lbl = document.createElement('span');
+  lbl.className   = 'hp-name';
+  lbl.textContent = name;
+  row.appendChild(lbl);
+
+  const slider = document.createElement('input');
+  slider.type      = 'range';
+  slider.min       = 1;
+  slider.max       = 100;
+  slider.value     = value;
+  slider.className = 'hp-slider';
+  slider.disabled  = locked;
+
+  const valDisplay = document.createElement('span');
+  valDisplay.className   = 'hp-val';
+  valDisplay.textContent = value;
+
+  slider.addEventListener('input', function() {
+    mSt[selModel][key] = +this.value;
+    valDisplay.textContent = this.value;
+  });
+
+  row.appendChild(slider);
+  row.appendChild(valDisplay);
+  return row;
+}
+
+// ── Training ──────────────────────────────────────────────────────────────────
+function doTrain() {
+  if (busy || mSt[selModel].lockedIn || credits <= 0) return;
+  busy = true;
+  credits--;
+  updateCreditsUI();
+  document.getElementById('train-btn').disabled = true;
+
+  const ms       = mSt[selModel];
+  const hp2arg   = hasHp2(selModel) ? ms.hp2 : null;
+  const cfg      = ds();
+  const duration = Math.max(400, (trainPt / cfg.total) * 2250);
+
+  const sweep = document.createElement('div');
+  sweep.className = 'train-sweep';
+  sweep.style.animationDuration = duration + 'ms';
+  document.getElementById('data-grid').appendChild(sweep);
+  sweep.addEventListener('animationend', () => sweep.remove(), { once: true });
+
+  showProg('Training…');
+  runProg(duration, trainPt, 'Training on example', () => {
+    const { trainAcc, valAcc } = computeAccuracy(selModel, ms.hp1, hp2arg);
+    ms.trainAcc = trainAcc;
+    ms.valAcc   = valAcc;
+    ms.trained  = true;
+    const jAmt = 2 * (ds().jitterMult || 1);
+    ms.runs.push({ hp1: ms.hp1, hp2: hp2arg, trainAcc, valAcc,
+      jx: (Math.random() - 0.5) * 2 * jAmt,
+      jy: (Math.random() - 0.5) * 2 * jAmt,
+    });
+
+    hideProg();
+    if (!splitLocked) lockSplit();
+    renderModelBtns();
+    showAccuracyFor(selModel);
+    renderLeaderboard();
+
+    const lbPanel    = document.getElementById('leaderboard-panel');
+    const chartsEl   = document.getElementById('charts-section');
+    if (lbPanel.style.display === 'none') {
+      lbPanel.style.display  = 'block';
+      chartsEl.style.display = 'block';
+      setTimeout(() => lbPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+    }
+    renderChartA();
+    renderChartB();
+
+    busy = false;
+    if (credits > 0 && !mSt[selModel].lockedIn) {
+      document.getElementById('train-btn').disabled = false;
+    }
+    updateCreditsUI();
+
+    Log.event('fp_train', {
+      dataset: curDatasetId, model: selModel, modelName: getLabels()[selModel],
+      curveIdx: modelOrder[selModel],
+      hp1: ms.hp1, hp2: hp2arg, trainAcc, valAcc,
+      creditsLeft: credits,
+    });
+  });
+}
+
+// ── Accuracy panel ────────────────────────────────────────────────────────────
+function clearAccuracyPanel(idx) {
+  const label = idx !== undefined ? getLabels()[idx] : '';
+  document.getElementById('acc-model-label').textContent = label;
+  document.getElementById('train-bar').style.width  = '0%';
+  document.getElementById('val-bar').style.width    = '0%';
+  document.getElementById('train-pct').textContent  = '—';
+  document.getElementById('val-pct').textContent    = '—';
+}
+
+function showAccuracyFor(idx) {
+  const ms    = mSt[idx];
+  const panel = document.getElementById('accuracy-panel');
+  panel.style.display = 'block';
+  document.getElementById('acc-model-label').textContent = getLabels()[idx];
+  requestAnimationFrame(() => {
+    setBar('train-bar', 'train-pct', ms.trainAcc);
+    setBar('val-bar',   'val-pct',   ms.valAcc);
+  });
+}
+
+function setBar(barId, pctId, val) {
+  document.getElementById(barId).style.width     = fmtPct(val);
+  document.getElementById(pctId).textContent = fmtPct(val);
+}
+
+// ── Hover tooltip ─────────────────────────────────────────────────────────────
+function showHoverTip(text, x, y) {
+  const tip = document.getElementById('tooltip');
+  tip.textContent = text; tip.dataset.src = '';
+  tip.style.maxWidth = '240px'; tip.style.display = 'block';
+  tip.style.left = Math.max(10, Math.min(x + 14, window.innerWidth - 250)) + 'px';
+  tip.style.top  = (y + 18) + 'px';
+}
+function hideHoverTip() { document.getElementById('tooltip').style.display = 'none'; }
+
+// ── Chart A: HP map ───────────────────────────────────────────────────────────
+const MODEL_COLORS = {
+  clean: ['#3b82f6','#f97316','#22c55e','#ec4899','#a855f7','#14b8a6'],
+  dark:  ['#60a5fa','#fb923c','#4ade80','#f472b6','#c084fc','#2dd4bf'],
+  retro: ['#00ff41','#ff6b35','#00bfff','#ffff00','#ff00ff','#ff4444'],
+  candy: ['#c026d3','#f97316','#06b6d4','#84cc16','#ef4444','#8b5cf6'],
+};
+
+const RAMP = {
+  clean: [[251,191,36],[99,102,241]],
+  dark:  [[251,191,36],[167,139,250]],
+  retro: [[251,191,36],[0,191,255]],
+  candy: [[251,191,36],[192,38,211]],
+};
+
+function lerpRgb(a, b, t) {
+  return 'rgb(' + [0,1,2].map(i => Math.round(a[i] + (b[i]-a[i]) * t)).join(',') + ')';
+}
+// Map val accuracy to [0,1] with 60% as the visual floor so 70–90% spreads
+// across most of the color and size range rather than crowding the top third.
+function valToT(val) {
+  return Math.max(0, Math.min(1, (val - 0.60) / (0.97 - 0.60)));
+}
+function valToColor(val) {
+  const ramp = RAMP[State.get('theme') || 'clean'] || RAMP.clean;
+  return lerpRgb(ramp[0], ramp[1], valToT(val));
+}
+
+function renderChartA() {
+  const svgEl = document.getElementById('chart-a');
+  if (!svgEl) return;
+
+  const ms   = mSt[selModel];
+  const set  = getModelSet();
+  const cfg  = HP_CONFIG[selModel][set];
+  const has2 = hasHp2(selModel);
+
+  document.getElementById('chart-a-label').textContent = 'HP Map — ' + getLabels()[selModel];
+
+  const W = 400, H = 200;
+  const P = { t: 14, r: 16, b: 38, l: has2 ? 44 : 24 };
+  const cW = W - P.l - P.r, cH = H - P.t - P.b;
+
+  svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  const ns = 'http://www.w3.org/2000/svg';
+  svgEl.innerHTML = '';
+
+  const mk = (tag, attrs, txt) => {
+    const el = document.createElementNS(ns, tag);
+    Object.entries(attrs || {}).forEach(([k, v]) => el.setAttribute(k, v));
+    if (txt !== undefined) el.textContent = txt;
+    svgEl.appendChild(el);
+    return el;
+  };
+
+  const xPx = v => P.l + (v / 100) * cW;
+  const yPx = v => has2 ? P.t + (1 - v / 100) * cH : P.t + cH / 2;
+
+  // Chart background
+  mk('rect', { x: P.l, y: P.t, width: cW, height: cH, fill: 'var(--bg)', opacity: '0.5' });
+
+  // Gridlines
+  [25, 50, 75].forEach(v => {
+    mk('line', { x1: xPx(v), y1: P.t, x2: xPx(v), y2: P.t + cH, stroke: 'var(--border)', 'stroke-width': '0.5' });
+    if (has2) mk('line', { x1: P.l, y1: yPx(v), x2: P.l + cW, y2: yPx(v), stroke: 'var(--border)', 'stroke-width': '0.5' });
+  });
+
+  // Axes
+  mk('line', { x1: P.l, y1: P.t + cH, x2: P.l + cW, y2: P.t + cH, stroke: 'var(--muted)', 'stroke-width': '1' });
+  if (has2) {
+    mk('line', { x1: P.l, y1: P.t, x2: P.l, y2: P.t + cH, stroke: 'var(--muted)', 'stroke-width': '1' });
+  } else {
+    mk('line', { x1: P.l, y1: yPx(50), x2: P.l + cW, y2: yPx(50), stroke: 'var(--border)', 'stroke-dasharray': '4 3', 'stroke-width': '1' });
+  }
+
+  // X axis ticks + labels
+  [0, 25, 50, 75, 100].forEach(v => {
+    mk('line', { x1: xPx(v), y1: P.t + cH, x2: xPx(v), y2: P.t + cH + 4, stroke: 'var(--muted)', 'stroke-width': '1' });
+    mk('text', { x: xPx(v), y: P.t + cH + 13, 'text-anchor': 'middle', 'font-size': '9', fill: 'var(--muted)' }, String(v));
+  });
+  mk('text', { x: P.l + cW / 2, y: H - 4, 'text-anchor': 'middle', 'font-size': '9', fill: 'var(--muted)', 'font-weight': '600' }, cfg.hp1);
+
+  // Y axis ticks + label (only for 2-HP models)
+  if (has2) {
+    [0, 25, 50, 75, 100].forEach(v => {
+      mk('line', { x1: P.l - 4, y1: yPx(v), x2: P.l, y2: yPx(v), stroke: 'var(--muted)', 'stroke-width': '1' });
+      mk('text', { x: P.l - 7, y: yPx(v) + 3, 'text-anchor': 'end', 'font-size': '9', fill: 'var(--muted)' }, String(v));
+    });
+    mk('text', {
+      x: 12, y: P.t + cH / 2, 'text-anchor': 'middle', 'dominant-baseline': 'middle',
+      'font-size': '9', fill: 'var(--muted)', 'font-weight': '600',
+      transform: `rotate(-90, 12, ${P.t + cH / 2})`,
+    }, cfg.hp2);
+  }
+
+  // Empty state
+  if (!ms.runs || ms.runs.length === 0) {
+    mk('text', {
+      x: P.l + cW / 2, y: P.t + cH / 2,
+      'text-anchor': 'middle', 'dominant-baseline': 'middle',
+      'font-size': '11', fill: 'var(--muted)',
+    }, 'No runs yet — train this model');
+    return;
+  }
+
+  // Dots
+  ms.runs.forEach(run => {
+    const hp1 = clamp(run.hp1 + (run.jx || 0), 0, 100);
+    const hp2 = has2 ? clamp((run.hp2 !== null ? run.hp2 : 50) + (run.jy || 0), 0, 100) : 50;
+    const x   = xPx(hp1), y = yPx(hp2);
+    const r   = Math.max(3, 3 + valToT(run.valAcc) * 11);
+    const fill = valToColor(run.valAcc);
+
+    const dot = document.createElementNS(ns, 'circle');
+    dot.setAttribute('cx', x); dot.setAttribute('cy', y); dot.setAttribute('r', r);
+    dot.setAttribute('fill', fill); dot.setAttribute('opacity', '0.85');
+    dot.setAttribute('stroke', 'var(--surface)'); dot.setAttribute('stroke-width', '1.5');
+    dot.style.cursor = 'pointer';
+
+    dot.addEventListener('mouseenter', e => {
+      const hp2str = has2 && run.hp2 !== null ? `, ${cfg.hp2}: ${run.hp2}` : '';
+      showHoverTip(`${cfg.hp1}: ${run.hp1}${hp2str}  ·  Val: ${fmtPct(run.valAcc)}`, e.clientX, e.clientY);
+    });
+    dot.addEventListener('mousemove', e => {
+      const tip = document.getElementById('tooltip');
+      tip.style.left = Math.max(10, Math.min(e.clientX + 14, window.innerWidth - 250)) + 'px';
+      tip.style.top  = (e.clientY + 18) + 'px';
+    });
+    dot.addEventListener('mouseleave', hideHoverTip);
+
+    svgEl.appendChild(dot);
+  });
+
+  // Legend
+  const legendEl = document.getElementById('chart-a-legend');
+  if (legendEl) {
+    const theme    = State.get('theme') || 'clean';
+    const ramp     = RAMP[theme] || RAMP.clean;
+    const hiColor  = `rgb(${ramp[1].join(',')})`;
+    const ns2      = 'http://www.w3.org/2000/svg';
+    const legSvg   = document.createElementNS(ns2, 'svg');
+    legSvg.setAttribute('width', '72'); legSvg.setAttribute('height', '20');
+    legSvg.style.flexShrink = '0';
+    [[8, 2 + valToT(0.65)*5, lerpRgb(ramp[0],ramp[1],valToT(0.65))],
+     [36, 2 + valToT(0.78)*5, lerpRgb(ramp[0],ramp[1],valToT(0.78))],
+     [64, 2 + valToT(0.92)*5, hiColor]].forEach(([cx, r, fill]) => {
+      const c = document.createElementNS(ns2, 'circle');
+      c.setAttribute('cx', cx); c.setAttribute('cy', 10); c.setAttribute('r', r);
+      c.setAttribute('fill', fill); c.setAttribute('opacity', '0.85');
+      c.setAttribute('stroke', 'var(--surface)'); c.setAttribute('stroke-width', '1');
+      legSvg.appendChild(c);
+    });
+    legendEl.innerHTML = '';
+    legendEl.appendChild(legSvg);
+    const span = document.createElement('span');
+    span.textContent = 'Val accuracy: lower → higher  (size + color)';
+    legendEl.appendChild(span);
+  }
+}
+
+// ── Chart B: dot histogram — val accuracy distribution across all runs ────────
+function renderChartB() {
+  const svgEl = document.getElementById('chart-b');
+  if (!svgEl) return;
+
+  const labels = getLabels();
+  const theme  = State.get('theme') || 'clean';
+  const colors = MODEL_COLORS[theme] || MODEL_COLORS.clean;
+  const set    = getModelSet();
+
+  const W = 400, H = 200;
+  const P = { t: 20, r: 16, b: 38, l: 16 };
+  const cW = W - P.l - P.r, cH = H - P.t - P.b;
+
+  svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const ns = 'http://www.w3.org/2000/svg';
+  svgEl.innerHTML = '';
+
+  const mk = (tag, attrs, txt) => {
+    const el = document.createElementNS(ns, tag);
+    Object.entries(attrs || {}).forEach(([k, v]) => el.setAttribute(k, v));
+    if (txt !== undefined) el.textContent = txt;
+    svgEl.appendChild(el); return el;
+  };
+
+  // Collect all runs with model index
+  const allRuns = [];
+  mSt.forEach((ms, i) => ms.runs.forEach(run => allRuns.push({ ...run, modelIdx: i })));
+
+  // Bin runs at 2% intervals
+  const BIN_W = 0.05;
+  const snap  = val => Math.round(val / BIN_W) * BIN_W;
+
+  const bins = {};
+  allRuns.forEach(run => {
+    const k = snap(run.valAcc).toFixed(2);
+    if (!bins[k]) bins[k] = [];
+    bins[k].push(run);
+  });
+
+  // X range: bracket actual data, snapped to bin boundaries
+  let xMin, xMax;
+  if (allRuns.length > 0) {
+    const lo = Math.min(...allRuns.map(r => r.valAcc));
+    const hi = Math.max(...allRuns.map(r => r.valAcc));
+    xMin = Math.max(0,   Math.floor((lo - 0.04) / BIN_W) * BIN_W);
+    xMax = Math.min(1,   Math.ceil( (hi + 0.04) / BIN_W) * BIN_W);
+  } else {
+    xMin = 0.60; xMax = 1.00;
+  }
+
+  const maxStack = allRuns.length > 0
+    ? Math.max(...Object.values(bins).map(b => b.length))
+    : 0;
+
+  // Dot radius: shrink when stacks would overflow
+  const dotR  = Math.min(8, Math.max(3, Math.floor(cH / (Math.max(1, maxStack) * 2.2))));
+  const pitch = 2 * dotR + 1;
+  const yBot  = P.t + cH;
+
+  // Background
+  mk('rect', { x: P.l, y: P.t, width: cW, height: cH, fill: 'var(--bg)', opacity: '0.5' });
+
+  // Baseline
+  mk('line', { x1: P.l, y1: yBot, x2: P.l + cW, y2: yBot, stroke: 'var(--muted)', 'stroke-width': '1' });
+
+  // X axis ticks + labels every 5% (10% if wide range)
+  const tickStep = (xMax - xMin) > 0.30 ? 0.10 : 0.05;
+  for (let v = Math.ceil(xMin / tickStep) * tickStep; v <= xMax + 0.001; v = Math.round((v + tickStep) * 100) / 100) {
+    const x = P.l + ((v - xMin) / (xMax - xMin)) * cW;
+    mk('line', { x1: x, y1: yBot, x2: x, y2: yBot + 4, stroke: 'var(--muted)', 'stroke-width': '1' });
+    mk('text', { x, y: yBot + 13, 'text-anchor': 'middle', 'font-size': '9', fill: 'var(--muted)' }, Math.round(v * 100) + '%');
+  }
+  mk('text', { x: P.l + cW / 2, y: H - 4, 'text-anchor': 'middle', 'font-size': '9', fill: 'var(--muted)', 'font-weight': '600' }, 'Val accuracy');
+
+  if (allRuns.length === 0) {
+    mk('text', { x: P.l + cW / 2, y: P.t + cH / 2, 'text-anchor': 'middle', 'dominant-baseline': 'middle', 'font-size': '11', fill: 'var(--muted)' }, 'No runs yet');
+    const legEl = document.getElementById('chart-b-legend');
+    if (legEl) legEl.innerHTML = '';
+    return;
+  }
+
+  // Stacked dots per bin
+  Object.entries(bins).forEach(([k, runs]) => {
+    const binCenter = parseFloat(k);
+    if (binCenter < xMin - BIN_W / 2 || binCenter > xMax + BIN_W / 2) return;
+    const x = P.l + ((binCenter - xMin) / (xMax - xMin)) * cW;
+
+    runs.sort((a, b) => a.modelIdx - b.modelIdx);
+
+    runs.forEach((run, stackIdx) => {
+      const cy    = yBot - dotR - stackIdx * pitch;
+      const color = colors[run.modelIdx];
+      const cfg   = HP_CONFIG[run.modelIdx][set];
+      const has2  = hasHp2(run.modelIdx);
+
+      const dot = document.createElementNS(ns, 'circle');
+      dot.setAttribute('cx', x); dot.setAttribute('cy', cy); dot.setAttribute('r', dotR);
+      dot.setAttribute('fill', color);
+      dot.setAttribute('stroke', 'var(--surface)'); dot.setAttribute('stroke-width', '1');
+      dot.style.cursor = 'pointer';
+
+      dot.addEventListener('mouseenter', e => {
+        const hp2str = has2 && run.hp2 !== null ? `, ${cfg.hp2}: ${run.hp2}` : '';
+        showHoverTip(`${labels[run.modelIdx]}  ·  ${cfg.hp1}: ${run.hp1}${hp2str}  ·  Val: ${fmtPct(run.valAcc)}`, e.clientX, e.clientY);
+      });
+      dot.addEventListener('mousemove', e => {
+        const tip = document.getElementById('tooltip');
+        tip.style.left = Math.max(10, Math.min(e.clientX + 14, window.innerWidth - 250)) + 'px';
+        tip.style.top  = (e.clientY + 18) + 'px';
+      });
+      dot.addEventListener('mouseleave', hideHoverTip);
+      svgEl.appendChild(dot);
+    });
+
+  });
+
+  // Legend — only models with runs
+  const legEl = document.getElementById('chart-b-legend');
+  if (legEl) {
+    legEl.innerHTML = '';
+    legEl.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;font-size:0.72rem;color:var(--muted);';
+    mSt.forEach((ms, i) => {
+      if (ms.runs.length === 0) return;
+      const item = document.createElement('div');
+      item.style.cssText = 'display:flex;align-items:center;gap:4px;';
+      const swatch = document.createElement('div');
+      swatch.style.cssText = `width:10px;height:10px;border-radius:50%;background:${colors[i]};flex-shrink:0;`;
+      item.appendChild(swatch);
+      const lbl = document.createElement('span');
+      lbl.textContent = labels[i];
+      item.appendChild(lbl);
+      legEl.appendChild(item);
+    });
+  }
+}
+
+function bestRunOf(ms) {
+  if (!ms.runs || ms.runs.length === 0) return null;
+  return ms.runs.reduce((b, r) => r.valAcc > b.valAcc ? r : b, ms.runs[0]);
+}
+
+// ── Leaderboard ───────────────────────────────────────────────────────────────
+function renderLeaderboard() {
+  const labels    = getLabels();
+  const set       = getModelSet();
+  const container = document.getElementById('leaderboard');
+  if (!container) return;
+
+  const oldPos = {};
+  container.querySelectorAll('.lb-row[data-idx]').forEach(row => {
+    oldPos[+row.dataset.idx] = row.getBoundingClientRect().top;
+  });
+
+  container.innerHTML = '';
+
+  const order = Array.from({length: 6}, (_, i) => i).sort((a, b) => {
+    const aL = mSt[a].lockedIn, bL = mSt[b].lockedIn;
+    const aT = mSt[a].trained,  bT = mSt[b].trained;
+    const aBest = bestRunOf(mSt[a])?.valAcc ?? 0;
+    const bBest = bestRunOf(mSt[b])?.valAcc ?? 0;
+    if (aL && bL)  return mSt[b].testAcc - mSt[a].testAcc;
+    if (aL)        return -1;
+    if (bL)        return 1;
+    if (aT && bT)  return bBest - aBest;
+    if (aT)        return -1;
+    if (bT)        return 1;
+    return a - b;
+  });
+
+  const lockedCount = mSt.filter(m => m.lockedIn).length;
+  const need = Math.max(0, 3 - lockedCount);
+  const lbHint = document.getElementById('lb-hint');
+  if (lbHint) lbHint.textContent =
+    lockedCount >= 3 ? '' : `Lock in ${need} more model${need !== 1 ? 's' : ''} to unlock deploy`;
+
+  let rank = 1;
+  order.forEach(i => {
+    const ms  = mSt[i];
+    const cfg = HP_CONFIG[i][set];
+    const row = document.createElement('div');
+    row.className = 'lb-row' + (!ms.trained ? ' untrained' : ms.lockedIn ? ' is-locked' : '');
+    row.dataset.idx = i;
+
+    const rankEl = document.createElement('div');
+    rankEl.className = 'lb-rank';
+    rankEl.textContent = ms.lockedIn ? '#' + rank++ : '—';
+    row.appendChild(rankEl);
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'lb-name';
+    nameEl.textContent = labels[i];
+    row.appendChild(nameEl);
+
+    const best = bestRunOf(ms);
+    const hpEl = document.createElement('div');
+    hpEl.className = 'lb-hps';
+    if (ms.trained) {
+      const h1 = ms.lockedIn ? ms.lockedHp1 : (best ? best.hp1 : ms.hp1);
+      const h2 = hasHp2(i) ? (ms.lockedIn ? ms.lockedHp2 : (best ? best.hp2 : ms.hp2)) : null;
+      hpEl.textContent = h1 + (h2 !== null ? ' / ' + h2 : '');
+    } else {
+      hpEl.textContent = '—';
+    }
+    row.appendChild(hpEl);
+
+    const valEl = document.createElement('div');
+    valEl.className = 'lb-val';
+    valEl.textContent = ms.lockedIn ? fmtPct(ms.valAcc)
+                      : best        ? fmtPct(best.valAcc)
+                      : '—';
+    row.appendChild(valEl);
+
+    const testEl = document.createElement('div');
+    testEl.className = 'lb-test';
+    if (!ms.trained) {
+      const dash = document.createElement('span');
+      dash.className = 'lb-dash'; dash.textContent = '—';
+      testEl.appendChild(dash);
+    } else if (ms.lockedIn) {
+      const gap = ms.testAcc - ms.valAcc;
+      const cls = Math.abs(gap) <= 0.04 ? 'good' : gap < -0.04 ? 'bad' : 'ok';
+      const score = document.createElement('span');
+      score.className = 'test-score ' + cls;
+      score.textContent = fmtPct(ms.testAcc);
+      testEl.appendChild(score);
+    } else {
+      const btn = document.createElement('button');
+      btn.className = 'reveal-btn';
+      btn.innerHTML = '🔒 Lock In';
+      btn.onclick = () => startReveal(i);
+      testEl.appendChild(btn);
+    }
+    row.appendChild(testEl);
+
+    container.appendChild(row);
+  });
+
+  container.querySelectorAll('.lb-row[data-idx]').forEach(row => {
+    const idx = +row.dataset.idx;
+    if (oldPos[idx] === undefined) return;
+    const delta = oldPos[idx] - row.getBoundingClientRect().top;
+    if (Math.abs(delta) < 2) return;
+    row.style.transition = 'none';
+    row.style.transform  = `translateY(${delta}px)`;
+    row.getBoundingClientRect();
+    row.style.transition = 'transform 0.4s ease';
+    row.style.transform  = 'translateY(0)';
+    row.addEventListener('transitionend', () => {
+      row.style.transition = '';
+      row.style.transform  = '';
+    }, { once: true });
+  });
+
+  renderModelHistory();
+
+  if (lockedCount >= 3) showDeploySection();
+}
+
+// ── Per-model run history ─────────────────────────────────────────────────────
+function renderModelHistory() {
+  const container = document.getElementById('model-history');
+  if (!container) return;
+
+  const ms    = mSt[selModel];
+  const set   = getModelSet();
+  const cfg   = HP_CONFIG[selModel][set];
+  const has2  = hasHp2(selModel);
+  document.getElementById('mhist-label').textContent = getLabels()[selModel] + ' — Runs';
+
+  container.innerHTML = '';
+
+  if (!ms.runs || ms.runs.length === 0) {
+    container.innerHTML = '<div style="font-size:0.82rem;color:var(--muted);padding:4px 0;">No runs yet — train this model to see results here.</div>';
+    return;
+  }
+
+  const cols = has2 ? '20px 1fr 1fr 40px 40px' : '20px 1fr 40px 40px';
+
+  const header = document.createElement('div');
+  header.className = 'mhist-row mhist-header';
+  header.style.gridTemplateColumns = cols;
+  header.innerHTML = has2
+    ? `<div></div><div>${cfg.hp1}</div><div>${cfg.hp2}</div><div style="text-align:right;color:var(--train);">Train</div><div style="text-align:right;color:var(--val);">Val</div>`
+    : `<div></div><div>${cfg.hp1}</div><div style="text-align:right;color:var(--train);">Train</div><div style="text-align:right;color:var(--val);">Val</div>`;
+  container.appendChild(header);
+
+  [...ms.runs]
+    .sort((a, b) => b.valAcc - a.valAcc)
+    .forEach((run, rank) => {
+      const isSelected = run.trainAcc === ms.trainAcc && run.valAcc === ms.valAcc;
+      const row = document.createElement('div');
+      row.className = 'mhist-row' + (rank === 0 ? ' best' : '') + (isSelected ? ' selected' : '');
+      row.style.gridTemplateColumns = cols;
+      row.innerHTML = has2
+        ? `<div class="mhist-rank">#${rank+1}</div><div class="mhist-hpval">${run.hp1}</div><div class="mhist-hpval">${run.hp2 !== null ? run.hp2 : '—'}</div><div class="mhist-acc mhist-train">${fmtPct(run.trainAcc)}</div><div class="mhist-acc mhist-val">${fmtPct(run.valAcc)}</div>`
+        : `<div class="mhist-rank">#${rank+1}</div><div class="mhist-hpval">${run.hp1}</div><div class="mhist-acc mhist-train">${fmtPct(run.trainAcc)}</div><div class="mhist-acc mhist-val">${fmtPct(run.valAcc)}</div>`;
+
+      if (!ms.lockedIn) {
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', () => {
+          ms.hp1 = run.hp1;
+          if (has2 && run.hp2 !== null) ms.hp2 = run.hp2;
+          ms.trainAcc = run.trainAcc;
+          ms.valAcc   = run.valAcc;
+          renderHpPanel();
+          showAccuracyFor(selModel);
+          renderLeaderboard();
+        });
+      }
+
+      container.appendChild(row);
+    });
+}
+
+// ── Deploy section ─────────────────────────────────────────────────────────────
+function showDeploySection() {
+  const el = document.getElementById('deploy-section');
+  if (el.style.display !== 'none') return;
+  el.style.display = 'block';
+  renderDeploySection();
+  setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+}
+
+function renderDeploySection() {
+  const el     = document.getElementById('deploy-section');
+  const locked = mSt.map((ms, i) => ({ ms, i })).filter(x => x.ms.lockedIn);
+  const labels = getLabels();
+  const cfg    = ds();
+
+  el.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-top:16px;">
+      <div class="section-label" style="margin-bottom:8px;">Deploy to Production</div>
+      <p style="font-size:0.85rem;color:var(--muted);margin:0 0 14px;">Pick one model to ship. It goes head-to-head against the competitor's model (${cfg.competitorScore}% accuracy) on the held-out test set.</p>
+      <div id="dp-choices" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+      <div id="dp-arena" style="display:none;margin-top:16px;"></div>
+    </div>`;
+
+  const choicesEl = document.getElementById('dp-choices');
+  locked.forEach(({ ms, i }) => {
+    const btn = document.createElement('button');
+    btn.className     = 'btn';
+    btn.id            = `deploy-btn-${i}`;
+    btn.style.cssText = 'font-size:0.85rem;padding:9px 16px;';
+    btn.innerHTML     = `${labels[i]} &nbsp;·&nbsp; Test: <strong>${fmtPct(ms.testAcc)}</strong>`;
+    btn.onclick       = () => deployModel(i);
+    choicesEl.appendChild(btn);
+  });
+}
+
+function deployModel(idx) {
+  if (deployedIdx >= 0) return;
+  deployedIdx = idx;
+  document.querySelectorAll('[id^="deploy-btn-"]').forEach(b => b.disabled = true);
+
+  const ms        = mSt[idx];
+  const cfg       = ds();
+  const labels    = getLabels();
+  const compAcc   = cfg.competitorScore / 100;
+  const testCount = Math.min(30, Math.max(10, ds().total - testStartPt));
+
+  const arenaEl = document.getElementById('dp-arena');
+  arenaEl.style.display = 'block';
+  arenaEl.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 28px 1fr;gap:10px;align-items:start;">
+      <div>
+        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:6px;">${labels[idx]}</div>
+        <div id="dp-pgrid" style="display:grid;grid-template-columns:repeat(10,1fr);gap:3px;"></div>
+        <div id="dp-ptally" style="margin-top:8px;font-size:1rem;font-weight:800;color:var(--train);min-height:1.4em;"></div>
+      </div>
+      <div style="font-size:0.8rem;font-weight:800;color:var(--muted);text-align:center;padding-top:2px;">vs</div>
+      <div>
+        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:6px;">Competitor</div>
+        <div id="dp-cgrid" style="display:grid;grid-template-columns:repeat(10,1fr);gap:3px;"></div>
+        <div id="dp-ctally" style="margin-top:8px;font-size:1rem;font-weight:800;color:var(--muted);min-height:1.4em;"></div>
+      </div>
+    </div>
+    <div id="dp-final"></div>`;
+
+  const pgrid = document.getElementById('dp-pgrid');
+  const cgrid = document.getElementById('dp-cgrid');
+  const pBlocks = [], cBlocks = [];
+  for (let k = 0; k < testCount; k++) {
+    const pb = document.createElement('div'); pb.className = 'dp-block'; pgrid.appendChild(pb); pBlocks.push(pb);
+    const cb = document.createElement('div'); cb.className = 'dp-block'; cgrid.appendChild(cb); cBlocks.push(cb);
+  }
+
+  let pC = 0, cC = 0, tick = 0;
+  const iv = setInterval(() => {
+    if (tick >= testCount) {
+      clearInterval(iv);
+      const base    = Math.round(ms.testAcc * 100);
+      const cred    = credits;
+      const won     = ms.testAcc >= compAcc;
+      const bonus   = won ? 25 : 0;
+      const total   = base + cred + bonus;
+      setTimeout(() => showDeployFinal(base, cred, bonus, total, won, cfg.competitorScore), 500);
+      return;
+    }
+    const pH = Math.random() < ms.testAcc;
+    const cH = Math.random() < compAcc;
+    if (pH) pC++; if (cH) cC++;
+    pBlocks[tick].className = 'dp-block ' + (pH ? 'correct' : 'wrong');
+    cBlocks[tick].className = 'dp-block ' + (cH ? 'correct' : 'wrong');
+    document.getElementById('dp-ptally').textContent = `${pC} / ${tick + 1}`;
+    document.getElementById('dp-ctally').textContent = `${cC} / ${tick + 1}`;
+    tick++;
+  }, 85);
+}
+
+function showDeployFinal(base, cred, bonus, total, won, compPct) {
+  const scoreColor = won ? 'var(--train)' : 'var(--test)';
+  const outcomeMsg = won
+    ? `Your model (${base}%) beat the competitor (${compPct}%) — +25 bonus! ⭐`
+    : `Competitor scored ${compPct}% — your model got ${base}%. Try a better model or save more credits.`;
+
+  const finalEl = document.getElementById('dp-final');
+  if (!finalEl) return;
+  finalEl.style.cssText = 'border-top:1px solid var(--border);margin-top:16px;padding-top:16px;';
+  finalEl.innerHTML = `
+    <div class="section-label" style="margin-bottom:10px;">Score Breakdown</div>
+    <div style="display:flex;flex-direction:column;gap:7px;font-size:0.88rem;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <span style="color:var(--muted);">Test accuracy <small>(${base}%)</small></span>
+        <strong>+<span id="dp-s-base">0</span> pts</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <span style="color:var(--muted);">Unused credits <small>(${cred})</small></span>
+        <strong>+<span id="dp-s-cred">0</span> pts</strong>
+      </div>
+      ${bonus > 0 ? `<div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <span style="color:var(--train);">Beat competitor bonus</span>
+        <strong style="color:var(--train);">+<span id="dp-s-bonus">0</span> pts</strong>
+      </div>` : ''}
+      <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:10px;margin-top:2px;">
+        <span style="font-weight:700;">Final score</span>
+        <span style="font-weight:800;font-size:1.8rem;line-height:1;color:${scoreColor};" id="dp-s-total">0</span>
+      </div>
+    </div>
+    <div id="dp-outcome" style="display:none;margin-top:12px;padding:10px 14px;border-radius:calc(var(--radius)/1.5);
+      font-size:0.88rem;font-weight:600;
+      background:color-mix(in srgb,${scoreColor} 12%,var(--surface));
+      border:1px solid color-mix(in srgb,${scoreColor} 35%,var(--border));
+      color:${scoreColor};">${outcomeMsg}</div>`;
+
+  const dur = 900; const t0 = performance.now();
+  (function frame(now) {
+    const e = 1 - Math.pow(1 - Math.min((now - t0) / dur, 1), 3);
+    document.getElementById('dp-s-base').textContent = Math.round(e * base);
+    document.getElementById('dp-s-cred').textContent = Math.round(e * cred);
+    const bEl = document.getElementById('dp-s-bonus');
+    if (bEl) bEl.textContent = Math.round(e * bonus);
+    document.getElementById('dp-s-total').textContent = Math.round(e * total);
+    if (e < 1) { requestAnimationFrame(frame); return; }
+    document.getElementById('dp-outcome').style.display = 'block';
+    const prev = fpGet('highScores', {});
+    if (!prev[ds().id] || total > prev[ds().id]) {
+      prev[ds().id] = total; fpSet('highScores', prev); renderDatasetSelector();
+    }
+  })(performance.now());
+}
+
+// ── Reveal (stub — Step 2) ────────────────────────────────────────────────────
+function startReveal(idx) {
+  pendingRevealIdx = idx;
+  document.getElementById('reveal-model-name').textContent = getLabels()[idx];
+  document.getElementById('reveal-overlay').style.display = 'flex';
+}
+function confirmReveal() {
+  document.getElementById('reveal-overlay').style.display = 'none';
+  if (pendingRevealIdx < 0) return;
+  const idx = pendingRevealIdx;
+  const ms  = mSt[idx];
+  ms.testAcc   = computeTestAcc(ms.valAcc);
+  ms.lockedIn  = true;
+  ms.lockedHp1 = ms.hp1;
+  ms.lockedHp2 = hasHp2(idx) ? ms.hp2 : null;
+  pendingRevealIdx = -1;
+  renderModelBtns();
+  renderLeaderboard();
+  if (selModel === idx) renderHpPanel();
+}
+function cancelReveal() {
+  document.getElementById('reveal-overlay').style.display = 'none';
+  pendingRevealIdx = -1;
+}
+
+// ── Progress bar ──────────────────────────────────────────────────────────────
+function showProg(label) {
+  document.getElementById('prog-label').textContent = label;
+  document.getElementById('prog-fill').style.width  = '0%';
+  document.getElementById('prog-text').textContent  = '';
+  document.getElementById('progress-panel').style.display = 'block';
+  document.getElementById('train-btn-wrap').style.display = 'none';
+}
+function hideProg() {
+  document.getElementById('progress-panel').style.display = 'none';
+  document.getElementById('train-btn-wrap').style.display = 'flex';
+}
+function runProg(duration, total, verb, onDone) {
+  const t0 = performance.now(); let lastStep = -1;
+  (function frame(now) {
+    const p = Math.min((now - t0) / duration, 1);
+    const e = 1 - Math.pow(1 - p, 2);
+    const step = Math.round(e * total);
+    document.getElementById('prog-fill').style.width = (e * 100).toFixed(1) + '%';
+    if (step !== lastStep) {
+      document.getElementById('prog-text').textContent = verb + ' ' + step + '/' + total;
+      lastStep = step;
+    }
+    if (p < 1) requestAnimationFrame(frame);
+    else setTimeout(onDone, 150);
+  })(performance.now());
+}
+
+// ── Menu ──────────────────────────────────────────────────────────────────────
+function toggleMenu() { document.getElementById('menu-dropdown').classList.toggle('open'); }
+function menuAction(action) {
+  document.getElementById('menu-dropdown').classList.remove('open');
+  if (action === 'theme')  document.getElementById('theme-overlay').style.display = 'flex';
+  if (action === 'models') document.getElementById('model-overlay').style.display  = 'flex';
+  if (action === 'reset')  document.getElementById('reset-overlay').style.display  = 'flex';
+}
+
+function pickTheme(name) {
+  State.set('theme', name); Themes.apply(name);
+  document.getElementById('theme-overlay').style.display = 'none';
+  renderChartA();
+  renderChartB();
+}
+function pickModelSet(name) {
+  State.set('modelSet', name);
+  document.getElementById('model-overlay').style.display = 'none';
+  renderModelBtns();
+  renderHpPanel();
+  renderDatasetSelector();
+  renderLeaderboard();
+  renderChartA();
+  renderChartB();
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+function doReset() {
+  document.getElementById('reset-overlay').style.display = 'none';
+  initSession();
+  Log.event('fp_reset', { dataset: curDatasetId });
+}
+
+// ── Global event listeners ────────────────────────────────────────────────────
+document.getElementById('slider-train').addEventListener('input', function() {
+  if (splitLocked) return;
+  let v = +this.value;
+  v = Math.max(MIN_TRAIN, Math.min(v, testStartPt - MIN_VAL));
+  trainPt = v;
+  this.value = v;
+  renderGrid();
+  updateSplitUI();
+});
+
+document.getElementById('slider-test').addEventListener('input', function() {
+  if (splitLocked) return;
+  const total = ds().total;
+  let v = +this.value;
+  v = Math.max(trainPt + MIN_VAL, Math.min(v, total - MIN_TEST));
+  testStartPt = v;
+  this.value = v;
+  renderGrid();
+  updateSplitUI();
+});
+
+document.addEventListener('click', () => {
+  document.getElementById('tooltip').style.display = 'none';
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#menu-btn') && !e.target.closest('#menu-dropdown')) {
+    document.getElementById('menu-dropdown').classList.remove('open');
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+Themes.fromState();
+if (State.get('modelSet')) {
+  // already have model set from main game — no overlay needed
+}
+
+initSession();
+</script>
+</body>
+</html>
