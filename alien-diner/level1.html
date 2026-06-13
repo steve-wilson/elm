@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alien Diner – Level 1</title>
+<link rel="stylesheet" href="css/shared.css">
+<style>
+/* ── Diner scene ──────────────────────────────────── */
+.diner-col { max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+
+.customer-counter {
+  font-size: 0.72rem; color: var(--muted); text-align: center;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+
+.diner-scene {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+}
+
+.diner-stage {
+  width: 100%; height: 200px; position: relative; overflow: hidden;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+
+/* Start prompt */
+.start-prompt {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 12px;
+}
+.start-prompt p { font-size: 0.85rem; color: var(--muted); text-align: center; }
+
+/* Walking alien — padding-top reserves space above alien's head for the reaction badge */
+.alien-walker {
+  position: absolute; bottom: 0;
+  display: none;
+  flex-direction: column; align-items: center; gap: 8px;
+  padding-top: 46px;
+  transition: transform 1.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.35s;
+}
+.alien-walker.off-right { transform: translateX(300px); }
+.alien-walker.off-left  { transform: translateX(-300px); opacity: 0; }
+.alien-walker.on-stage  { transform: translateX(0); }
+
+/* Patience bar */
+.patience-wrap { width: 80px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.patience-fill { height: 100%; width: 100%; border-radius: 3px; background: var(--success); transition: width linear; }
+.patience-fill.urgent { background: var(--danger); }
+
+/* Reaction badge — sits in the padding-top area, just above the alien's head */
+.reaction-badge {
+  font-size: 2.2rem; position: absolute;
+  top: 4px; left: 50%;
+  pointer-events: none; z-index: 10;
+  animation: badge-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes badge-pop {
+  from { transform: translateX(-50%) scale(0); opacity: 0; }
+  to   { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+
+/* Food buttons */
+.food-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%; }
+.food-btn {
+  padding: 18px 10px; border: 2px solid var(--border);
+  border-radius: var(--radius); background: var(--bg);
+  font-family: var(--font); color: var(--text); cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  font-size: 0.82rem;
+}
+.food-btn:hover:not(:disabled) { transform: translateY(-2px); }
+.food-btn:active:not(:disabled) { transform: translateY(0); }
+.food-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.food-btn.berry-food:hover:not(:disabled)   { border-color: var(--vorb-clr); background: color-mix(in srgb, var(--vorb-clr) 8%, var(--bg)); }
+.food-btn.crystal-food:hover:not(:disabled) { border-color: var(--glim-clr); background: color-mix(in srgb, var(--glim-clr) 8%, var(--bg)); }
+.food-btn.correct-food { border-color: var(--success) !important; background: color-mix(in srgb, var(--success) 8%, var(--bg)); }
+.food-btn.wrong-food   { border-color: var(--danger)  !important; opacity: 0.5; }
+.food-emoji { font-size: 2.2rem; line-height: 1; }
+.food-name  { font-weight: 700; font-size: 0.9rem; }
+
+/* Score track */
+.score-track {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  padding: 10px 14px; background: var(--bg);
+  border-radius: var(--radius); border: 1px solid var(--border); width: 100%;
+}
+.score-pip {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.72rem; font-weight: 700; transition: background 0.2s;
+}
+.score-pip.correct { background: var(--success); color: #fff; }
+.score-pip.wrong   { background: var(--danger);  color: #fff; }
+.score-pip.miss    { background: var(--muted);   color: #fff; }
+.score-pip.pending { background: var(--border);  color: var(--muted); }
+.score-summary { margin-left: auto; font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+
+/* ── Results ──────────────────────────────────────── */
+.results-header {
+  display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px 24px; margin-bottom: 20px;
+}
+.big-pct { font-size: 3.2rem; font-weight: 800; line-height: 1; }
+.big-pct.high { color: var(--success); }
+.big-pct.mid  { color: var(--accent); }
+.big-pct.low  { color: var(--danger); }
+.results-blurb h2 { font-size: 1.1rem; margin-bottom: 6px; }
+.results-blurb p  { font-size: 0.88rem; color: var(--muted); line-height: 1.6; }
+
+.result-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px; margin-bottom: 20px;
+}
+.result-card-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
+}
+.result-card-header h3 { font-size: 0.9rem; margin: 0; }
+
+/* Breakdown grid */
+.breakdown-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; position: relative; }
+.breakdown-item {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  font-size: 0.68rem; color: var(--muted);
+}
+.pip-dot { width: 9px; height: 9px; border-radius: 50%; }
+.pip-dot.correct { background: var(--success); }
+.pip-dot.wrong   { background: var(--danger); }
+.pip-dot.miss    { background: var(--muted); }
+
+/* Group labels (shown after sort) */
+.group-label {
+  width: 100%; font-size: 0.72rem; font-weight: 700; padding: 4px 0 2px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.group-label.berry   { color: var(--vorb-clr); margin-top: 4px; }
+.group-label.crystal { color: var(--glim-clr); margin-top: 10px; }
+
+/* Feature pick buttons */
+.feature-pick-row {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px;
+}
+.feat-pick-btn {
+  padding: 8px 16px; border: 2px solid var(--border);
+  border-radius: 20px; background: var(--bg);
+  font-family: var(--font); font-size: 0.8rem; font-weight: 600;
+  color: var(--text); cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.feat-pick-btn:hover { border-color: var(--accent); }
+.feat-pick-btn.used  { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg)); cursor: default; }
+
+/* Feature reveal cards */
+.feature-reveal-card {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px 16px; margin-bottom: 12px;
+  background: var(--bg);
+}
+.frc-title {
+  font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--muted); margin-bottom: 10px;
+}
+.frc-class-row {
+  display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px;
+}
+.frc-class-row:last-of-type { margin-bottom: 0; }
+.frc-emoji { font-size: 1.1rem; line-height: 1.6; flex-shrink: 0; }
+.frc-vals { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.frc-val-row { display: flex; align-items: center; gap: 7px; font-size: 0.78rem; }
+.frc-val-name { width: 80px; flex-shrink: 0; }
+.frc-bar-bg { flex: 1; height: 7px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.frc-bar-fill { height: 100%; border-radius: 4px; width: 0%; transition: width 0.55s ease; }
+.frc-bar-fill.berry   { background: var(--vorb-clr); }
+.frc-bar-fill.crystal { background: var(--glim-clr); }
+.frc-val-count { font-size: 0.7rem; color: var(--muted); width: 28px; text-align: right; flex-shrink: 0; }
+.frc-insight {
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+  font-size: 0.78rem; line-height: 1.5;
+}
+.frc-insight.predictive     { color: var(--success); }
+.frc-insight.not-predictive { color: var(--muted); }
+
+/* Insight box */
+.insight-box {
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  border: 1px solid var(--accent); border-radius: var(--radius);
+  padding: 18px 20px; margin-bottom: 20px;
+}
+.insight-box h3 { font-size: 0.95rem; margin-bottom: 8px; }
+.insight-box p  { font-size: 0.88rem; color: var(--muted); line-height: 1.65; margin-top: 8px; }
+
+/* ── Shared helpers ───────────────────────────────── */
+.phase { display: none; }
+.phase.active { display: block; }
+.mt-16 { margin-top: 16px; }
+
+@media (max-width: 600px) {
+  .diner-col { max-width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Intro overlay ──────────────────────────────── -->
+<div class="overlay" id="intro-overlay">
+  <div class="intro-card">
+    <h1>Welcome to the Diner</h1>
+    <p>Two kinds of aliens are coming to eat. One kind likes <strong>berries</strong>. The other likes <strong>crystals</strong>.</p>
+    <p>Nobody's going to tell you which is which. Serve each customer — and you'll find out if you got it right.</p>
+    <p>See if you can figure out the pattern before the rush is over.</p>
+    <button class="btn btn-primary" onclick="beginRush()">Open the doors →</button>
+  </div>
+</div>
+
+<!-- ── App ────────────────────────────────────────── -->
+<div id="app">
+  <header>
+    <span class="header-title">Alien Diner</span>
+    <span class="level-badge">Level 1</span>
+    <div class="menu-wrap">
+      <button class="icon-btn" id="menu-btn" onclick="toggleMenu()">⚙</button>
+      <div class="menu-dropdown" id="menu-dropdown">
+        <button class="menu-item" onclick="openThemePicker()">Switch theme</button>
+        <hr class="menu-divider">
+        <button class="menu-item danger" onclick="resetProgress()">Reset progress</button>
+      </div>
+    </div>
+  </header>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar" id="progress-bar" style="width:5%"></div>
+  </div>
+
+  <main>
+
+    <!-- Phase: rush ─────────────────────────────── -->
+    <div class="phase" id="phase-rush">
+      <div class="diner-col">
+        <div class="customer-counter" id="customer-counter">&nbsp;</div>
+
+        <div class="diner-scene">
+          <div class="diner-stage" id="diner-stage">
+
+            <div class="start-prompt" id="start-prompt">
+              <p>First customers are waiting outside…</p>
+              <button class="btn btn-next" onclick="beginRush()">Open the doors →</button>
+            </div>
+
+            <div class="alien-walker off-right" id="alien-walker">
+              <div id="walker-svg"></div>
+              <div class="patience-wrap">
+                <div class="patience-fill" id="patience-fill"></div>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="food-buttons">
+            <button class="food-btn berry-food" id="btn-berry" onclick="serveFood('berry')" disabled>
+              <span class="food-emoji">🫐</span>
+              <span class="food-name">Berries</span>
+            </button>
+            <button class="food-btn crystal-food" id="btn-crystal" onclick="serveFood('crystal')" disabled>
+              <span class="food-emoji">💎</span>
+              <span class="food-name">Crystals</span>
+            </button>
+          </div>
+
+          <div class="score-track" id="score-track"></div>
+        </div>
+      </div>
+    </div><!-- /phase-rush -->
+
+    <!-- Phase: results ──────────────────────────── -->
+    <div class="phase" id="phase-results">
+
+      <div class="results-header">
+        <div class="big-pct" id="results-pct"></div>
+        <div class="results-blurb">
+          <h2 id="results-headline"></h2>
+          <p id="results-subline"></p>
+        </div>
+      </div>
+
+      <!-- All 10 customers -->
+      <div class="result-card">
+        <div class="result-card-header">
+          <h3>All 10 customers</h3>
+          <button class="btn btn-secondary" id="sort-btn" onclick="sortByClass()" style="font-size:0.78rem; padding:6px 14px">Sort by class</button>
+        </div>
+        <div class="breakdown-grid" id="breakdown-grid"></div>
+      </div>
+
+      <!-- Interactive feature reveal -->
+      <div class="result-card">
+        <h3 style="margin-bottom:6px">Which features actually matter?</h3>
+        <p style="font-size:0.83rem; color:var(--muted)">Pick a feature to see how it was distributed across the two groups.</p>
+        <div class="feature-pick-row" id="feature-pick-row">
+          <button class="feat-pick-btn" data-feat="body"    onclick="revealFeature('body')">Body shape</button>
+          <button class="feat-pick-btn" data-feat="eyes"    onclick="revealFeature('eyes')">Eyes</button>
+          <button class="feat-pick-btn" data-feat="legs"    onclick="revealFeature('legs')">Legs</button>
+          <button class="feat-pick-btn" data-feat="texture" onclick="revealFeature('texture')">Texture</button>
+          <button class="feat-pick-btn" data-feat="color"   onclick="revealFeature('color')">Color</button>
+        </div>
+        <div id="feature-reveals"></div>
+      </div>
+
+      <div class="insight-box" id="insight-box"></div>
+
+      <button class="btn btn-next" onclick="showPhase('checkin')">Quick check-in →</button>
+    </div><!-- /phase-results -->
+
+    <!-- Phase: check-in ─────────────────────────── -->
+    <div class="phase" id="phase-checkin">
+      <div class="card" style="max-width:560px">
+        <p style="font-weight:600; margin-bottom:4px">How's it going so far?</p>
+        <p style="font-size:0.82rem; color:var(--muted); margin-bottom:12px">Your answers are only used to improve this activity.</p>
+        <div class="checkin-btns" id="checkin-btns">
+          <button class="checkin-btn" onclick="selectRating('great')">Great</button>
+          <button class="checkin-btn" onclick="selectRating('okay')">Okay</button>
+          <button class="checkin-btn" onclick="selectRating('struggling')">Struggling</button>
+        </div>
+        <textarea class="checkin-feedback" id="checkin-feedback"
+          placeholder="Any feedback to help improve this? (optional)"></textarea>
+        <div class="mt-16">
+          <button class="btn btn-primary" id="checkin-submit" onclick="submitCheckin()" disabled>
+            Submit &amp; continue →
+          </button>
+        </div>
+      </div>
+    </div><!-- /phase-checkin -->
+
+  </main>
+</div><!-- /app -->
+
+<!-- Theme re-picker -->
+<div class="overlay" id="theme-repicker" style="display:none;">
+  <div class="picker-card">
+    <h1>Switch theme</h1>
+    <p>Your progress is saved — the theme is just a skin.</p>
+    <div class="picker-options">
+      <button class="picker-btn" onclick="switchTheme('diner')"><div class="swatch swatch-diner"></div><strong>Diner</strong><div class="theme-label">Retro 50s</div></button>
+      <button class="picker-btn" onclick="switchTheme('space')"><div class="swatch swatch-space"></div><strong>Space</strong><div class="theme-label">Deep Station</div></button>
+      <button class="picker-btn" onclick="switchTheme('alien')"><div class="swatch swatch-alien"></div><strong>Alien</strong><div class="theme-label">Bioluminescent</div></button>
+      <button class="picker-btn" onclick="switchTheme('arcade')"><div class="swatch swatch-arcade"></div><strong>Arcade</strong><div class="theme-label">Retro Cabinet</div></button>
+    </div>
+    <button class="btn btn-secondary mt-16" onclick="closeThemePicker()">Cancel</button>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script src="js/state.js"></script>
+<script src="js/log.js"></script>
+<script src="js/themes.js"></script>
+<script>
+/* ════════════════════════════════════════════════════
+   CONFIG
+   ════════════════════════════════════════════════════ */
+
+// trueLabel: food the alien prefers ('berry' | 'crystal')
+// color: decorative — evenly split across both classes, not predictive
+const RUSH_ALIENS = [
+  { id:'r1',  body:'round',   eyes:1, legs:2, texture:'spots',   color:'green',  trueLabel:'berry'   }, // easy
+  { id:'r2',  body:'angular', eyes:2, legs:4, texture:'stripes', color:'purple', trueLabel:'crystal' }, // easy
+  { id:'r3',  body:'angular', eyes:2, legs:4, texture:'stripes', color:'orange', trueLabel:'crystal' }, // easy — two crystals in a row
+  { id:'r4',  body:'round',   eyes:1, legs:2, texture:'spots',   color:'purple', trueLabel:'berry'   }, // easy
+  { id:'r5',  body:'angular', eyes:2, legs:2, texture:'stripes', color:'pink',   trueLabel:'crystal' }, // medium — unusual legs
+  { id:'r6',  body:'round',   eyes:1, legs:4, texture:'spots',   color:'cyan',   trueLabel:'berry'   }, // medium — unusual legs
+  { id:'r7',  body:'round',   eyes:2, legs:2, texture:'spots',   color:'orange', trueLabel:'berry'   }, // medium — unusual eyes
+  { id:'r8',  body:'angular', eyes:1, legs:4, texture:'stripes', color:'green',  trueLabel:'crystal' }, // medium — unusual eyes
+  { id:'r9',  body:'round',   eyes:2, legs:4, texture:'stripes', color:'pink',   trueLabel:'berry'   }, // hard — 3 of 4 features look crystal
+  { id:'r10', body:'angular', eyes:1, legs:2, texture:'spots',   color:'cyan',   trueLabel:'crystal' }, // hard — 3 of 4 features look berry
+];
+
+const ALIEN_COLORS = {
+  green:  { body:'#4ade80', stroke:'#16a34a' },
+  purple: { body:'#c084fc', stroke:'#7c3aed' },
+  orange: { body:'#fb923c', stroke:'#c2410c' },
+  pink:   { body:'#f472b6', stroke:'#be185d' },
+  cyan:   { body:'#22d3ee', stroke:'#0e7490' },
+};
+
+const FEATURE_LABELS = {
+  body:    { round:'Round', angular:'Angular' },
+  eyes:    { 1:'1 eye', 2:'2 eyes' },
+  legs:    { 2:'2 legs', 4:'4 legs' },
+  texture: { spots:'Spots', stripes:'Stripes' },
+  color:   { green:'Green', purple:'Purple', orange:'Orange', pink:'Pink', cyan:'Cyan' },
+};
+
+const FEATURE_NAMES = { body:'Body shape', eyes:'Eyes', legs:'Legs', texture:'Texture', color:'Color' };
+
+const PATIENCE_SECONDS = 6;
+
+const TOOLTIPS = {
+  feature_inventory: 'After each customer leaves, this panel updates with what you now know about them.',
+};
+
+/* ════════════════════════════════════════════════════
+   ALIEN SVG RENDERER
+   ════════════════════════════════════════════════════ */
+
+function renderAlien(f, px = 80) {
+  const h = (px * 1.18) | 0;
+  const cx = px / 2, cy = (px * 0.43) | 0;
+  const rx = (px * 0.33) | 0, ry = (px * 0.26) | 0;
+  const bc = ALIEN_COLORS[f.color] || { body:'var(--alien-body)', stroke:'var(--alien-stroke)' };
+  const BC = bc.body, SC = bc.stroke;
+
+  const body = f.body === 'round'
+    ? `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${BC}" stroke="${SC}" stroke-width="1.5"/>`
+    : `<polygon points="${cx},${cy-ry-4} ${cx+rx+4},${cy} ${cx},${cy+ry+4} ${cx-rx-4},${cy}" fill="${BC}" stroke="${SC}" stroke-width="1.5"/>`;
+
+  const tex = f.texture === 'spots'
+    ? `<circle cx="${(cx-rx*.38)|0}" cy="${(cy-ry*.18)|0}" r="${(px*.07)|0}" fill="white" opacity="0.22"/>
+       <circle cx="${(cx+rx*.28)|0}" cy="${(cy+ry*.28)|0}" r="${(px*.055)|0}" fill="white" opacity="0.18"/>
+       <circle cx="${(cx-rx*.08)|0}" cy="${(cy+ry*.55)|0}" r="${(px*.045)|0}" fill="white" opacity="0.15"/>`
+    : `<line x1="${cx-rx+6}" y1="${(cy-ry*.15)|0}" x2="${cx+rx-6}" y2="${(cy-ry*.15)|0}" stroke="white" stroke-width="2.5" opacity="0.22"/>
+       <line x1="${cx-rx+12}" y1="${(cy+ry*.32)|0}" x2="${cx+rx-12}" y2="${(cy+ry*.32)|0}" stroke="white" stroke-width="2" opacity="0.16"/>`;
+
+  const ey = (cy - ry * .1) | 0;
+  let eyes;
+  if (f.eyes === 1) {
+    const er = (px*.11)|0;
+    eyes = `<circle cx="${cx}" cy="${ey}" r="${er}" fill="white"/>
+            <circle cx="${cx}" cy="${ey}" r="${(er*.58)|0}" fill="#111"/>
+            <circle cx="${cx+(er*.35)|0}" cy="${ey-(er*.3)|0}" r="${(er*.22)|0}" fill="white"/>`;
+  } else {
+    const er = (px*.087)|0, ex = (px*.115)|0;
+    eyes = `<circle cx="${cx-ex}" cy="${ey}" r="${er}" fill="white"/>
+            <circle cx="${cx-ex}" cy="${ey}" r="${(er*.57)|0}" fill="#111"/>
+            <circle cx="${cx-ex+(er*.32)|0}" cy="${ey-(er*.3)|0}" r="${(er*.2)|0}" fill="white"/>
+            <circle cx="${cx+ex}" cy="${ey}" r="${er}" fill="white"/>
+            <circle cx="${cx+ex}" cy="${ey}" r="${(er*.57)|0}" fill="#111"/>
+            <circle cx="${cx+ex+(er*.32)|0}" cy="${ey-(er*.3)|0}" r="${(er*.2)|0}" fill="white"/>`;
+  }
+
+  const lt = cy + ry + 2, lb = h - 4;
+  let legs;
+  if (f.legs === 2) {
+    const sw = (px*.085)|0;
+    legs = `<path d="M${(cx-px*.14)|0},${lt} Q${(cx-px*.27)|0},${lt+(px*.17)|0} ${(cx-px*.23)|0},${lb}" stroke="${BC}" stroke-width="${sw}" fill="none" stroke-linecap="round"/>
+            <path d="M${(cx+px*.14)|0},${lt} Q${(cx+px*.27)|0},${lt+(px*.17)|0} ${(cx+px*.23)|0},${lb}" stroke="${BC}" stroke-width="${sw}" fill="none" stroke-linecap="round"/>`;
+  } else {
+    const lw = (px*.065)|0;
+    legs = `<line x1="${(cx-px*.24)|0}" y1="${lt}" x2="${(cx-px*.33)|0}" y2="${lb}" stroke="${BC}" stroke-width="${lw}" stroke-linecap="round"/>
+            <line x1="${(cx-px*.09)|0}" y1="${lt+2}" x2="${(cx-px*.11)|0}" y2="${lb}" stroke="${BC}" stroke-width="${lw}" stroke-linecap="round"/>
+            <line x1="${(cx+px*.09)|0}" y1="${lt+2}" x2="${(cx+px*.11)|0}" y2="${lb}" stroke="${BC}" stroke-width="${lw}" stroke-linecap="round"/>
+            <line x1="${(cx+px*.24)|0}" y1="${lt}" x2="${(cx+px*.33)|0}" y2="${lb}" stroke="${BC}" stroke-width="${lw}" stroke-linecap="round"/>`;
+  }
+
+  const atx = (cx+px*.13)|0, aty = (cy-ry-px*.12)|0;
+  const ant = `<line x1="${cx}" y1="${cy-ry-2}" x2="${atx}" y2="${aty}" stroke="${BC}" stroke-width="2" stroke-linecap="round"/>
+               <circle cx="${atx}" cy="${aty}" r="3" fill="${BC}"/>`;
+
+  return `<svg viewBox="0 0 ${px} ${h}" width="${px}" height="${h}" aria-hidden="true">${body}${tex}${eyes}${legs}${ant}</svg>`;
+}
+
+/* ════════════════════════════════════════════════════
+   PHASE MACHINE
+   ════════════════════════════════════════════════════ */
+
+function showPhase(name) {
+  document.querySelectorAll('.phase').forEach(el => el.classList.remove('active'));
+  document.getElementById('phase-' + name).classList.add('active');
+  const pcts = { rush:5, results:85, checkin:97 };
+  document.getElementById('progress-bar').style.width = (pcts[name] || 5) + '%';
+}
+
+/* ════════════════════════════════════════════════════
+   RUSH PHASE
+   ════════════════════════════════════════════════════ */
+
+let rushStarted = false;
+let rushIdx = 0;
+let rushResults = [];
+let patienceTimer = null;
+let missTimer = null;
+let customerStartTime = null;
+let foodLocked = false;
+
+function beginRush() {
+  if (rushStarted) return;
+  rushStarted = true;
+  State.set('level1IntroDismissed', true);
+  document.getElementById('intro-overlay').style.display = 'none';
+  document.getElementById('start-prompt').style.display = 'none';
+  const walker = document.getElementById('alien-walker');
+  walker.style.display = 'flex';
+  Log.introDismissed();
+  Log.rushStart();
+  nextCustomer();
+}
+
+function buildScoreTrack() {
+  const track = document.getElementById('score-track');
+  track.innerHTML =
+    RUSH_ALIENS.map((_,i) => `<div class="score-pip pending" id="pip-${i}">·</div>`).join('') +
+    `<span class="score-summary" id="score-summary">0 / 0</span>`;
+}
+
+function nextCustomer() {
+  if (rushIdx >= RUSH_ALIENS.length) { endRush(); return; }
+
+  const alien = RUSH_ALIENS[rushIdx];
+  document.getElementById('customer-counter').textContent =
+    `Customer ${rushIdx + 1} of ${RUSH_ALIENS.length}`;
+
+  const walker = document.getElementById('alien-walker');
+  document.getElementById('walker-svg').innerHTML = renderAlien(alien, 100);
+
+  // Snap offstage right, then walk in
+  walker.style.transition = 'none';
+  walker.classList.remove('on-stage', 'off-left');
+  walker.classList.add('off-right');
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    walker.style.transition = '';
+    walker.classList.remove('off-right');
+    walker.classList.add('on-stage');
+  }));
+
+  // Reset patience bar
+  const fill = document.getElementById('patience-fill');
+  fill.style.transition = 'none';
+  fill.style.width = '100%';
+  fill.classList.remove('urgent');
+
+  // Enable food buttons immediately
+  foodLocked = false;
+  customerStartTime = Date.now();
+  document.getElementById('btn-berry').removeAttribute('disabled');
+  document.getElementById('btn-crystal').removeAttribute('disabled');
+  document.getElementById('btn-berry').classList.remove('correct-food', 'wrong-food');
+  document.getElementById('btn-crystal').classList.remove('correct-food', 'wrong-food');
+
+  // Start patience bar draining
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    fill.style.transition = `width ${PATIENCE_SECONDS}s linear`;
+    fill.style.width = '0%';
+  }));
+  patienceTimer = setTimeout(() => fill.classList.add('urgent'), PATIENCE_SECONDS * 0.67 * 1000);
+  missTimer     = setTimeout(() => { if (!foodLocked) missCustomer(); }, PATIENCE_SECONDS * 1000);
+}
+
+function stopPatience() {
+  clearTimeout(patienceTimer);
+  clearTimeout(missTimer);
+  const fill = document.getElementById('patience-fill');
+  fill.style.transition = 'none';
+}
+
+function serveFood(choice) {
+  if (foodLocked) return;
+  foodLocked = true;
+  stopPatience();
+
+  const alien = RUSH_ALIENS[rushIdx];
+  const correct = choice === alien.trueLabel;
+  const reactionMs = Math.max(0, Date.now() - customerStartTime);
+
+  highlightButtons(choice, alien.trueLabel);
+  showReaction(correct);
+  recordResult(correct ? 'correct' : 'wrong', alien, choice, reactionMs);
+
+  setTimeout(advanceCustomer, 1900);
+}
+
+function missCustomer() {
+  if (foodLocked) return;
+  foodLocked = true;
+  stopPatience();
+
+  const alien = RUSH_ALIENS[rushIdx];
+  highlightButtons(null, alien.trueLabel);
+  showReaction(false);
+  recordResult('miss', alien, null, PATIENCE_SECONDS * 1000);
+
+  setTimeout(advanceCustomer, 1900);
+}
+
+function highlightButtons(chosen, trueLabel) {
+  const bB = document.getElementById('btn-berry');
+  const bC = document.getElementById('btn-crystal');
+  bB.setAttribute('disabled', ''); bC.setAttribute('disabled', '');
+  (trueLabel === 'berry' ? bB : bC).classList.add('correct-food');
+  if (chosen && chosen !== trueLabel) {
+    (chosen === 'berry' ? bB : bC).classList.add('wrong-food');
+  }
+}
+
+function showReaction(correct) {
+  const walker = document.getElementById('alien-walker');
+  const badge = document.createElement('div');
+  badge.className = 'reaction-badge';
+  badge.textContent = correct ? '😊' : '😡';
+  walker.appendChild(badge);
+  setTimeout(() => badge.remove(), 1700);
+}
+
+function advanceCustomer() {
+  const walker = document.getElementById('alien-walker');
+  walker.classList.remove('on-stage');
+  walker.classList.add('off-left');
+  rushIdx++;
+  setTimeout(nextCustomer, 500);
+}
+
+function recordResult(outcome, alien, studentChoice, reactionMs) {
+  rushResults.push({ alien, outcome, studentChoice, reactionMs });
+
+  const pip = document.getElementById(`pip-${rushIdx}`);
+  pip.className = 'score-pip ' + outcome;
+  pip.textContent = outcome === 'correct' ? '✓' : '✗';
+
+  const correct = rushResults.filter(r => r.outcome === 'correct').length;
+  document.getElementById('score-summary').textContent = `${correct} / ${rushResults.length}`;
+
+  Log.customerServed({
+    alienId: alien.id, trueLabel: alien.trueLabel,
+    studentAnswer: studentChoice, modelAnswer: null,
+    outcome, reactionTimeMs: reactionMs,
+  });
+}
+
+/* ════════════════════════════════════════════════════
+   RESULTS
+   ════════════════════════════════════════════════════ */
+
+let featureData = {};
+let isSorted = false;
+
+function endRush() {
+  const nCorrect = rushResults.filter(r => r.outcome === 'correct').length;
+  const acc = nCorrect / RUSH_ALIENS.length;
+  Log.rushComplete({ studentAccuracy: acc, modelAccuracy: null, agreementRate: null });
+  State.setLevel(1, { completed: true, studentAccuracy: acc });
+  buildFeatureData();
+  buildResults(nCorrect, acc);
+  showPhase('results');
+}
+
+function buildFeatureData() {
+  ['body','eyes','legs','texture','color'].forEach(feat => {
+    featureData[feat] = { berry: {}, crystal: {} };
+  });
+  rushResults.forEach(({ alien }) => {
+    const cls = alien.trueLabel;
+    ['body','eyes','legs','texture','color'].forEach(feat => {
+      const val = String(alien[feat]);
+      featureData[feat][cls][val] = (featureData[feat][cls][val] || 0) + 1;
+    });
+  });
+}
+
+function buildResults(nCorrect, acc) {
+  const pct = Math.round(acc * 100);
+  const cls = pct >= 80 ? 'high' : pct >= 50 ? 'mid' : 'low';
+
+  document.getElementById('results-pct').textContent = pct + '%';
+  document.getElementById('results-pct').className = 'big-pct ' + cls;
+  document.getElementById('results-headline').textContent =
+    pct >= 80 ? 'Nice — you picked up the pattern.' :
+    pct >= 50 ? 'Getting there.' : 'Tricky, right?';
+  document.getElementById('results-subline').textContent =
+    `${nCorrect} of 10 customers served correctly.` +
+    (pct < 80 ? ' The last two were designed to be close to the boundary.' : '');
+
+  // Breakdown grid: data-idx for original order, data-cls for sort
+  document.getElementById('breakdown-grid').innerHTML = rushResults.map((r, i) => `
+    <div class="breakdown-item" data-idx="${i}" data-cls="${r.alien.trueLabel}"
+         title="${r.alien.trueLabel === 'berry' ? '🫐 Berry fan' : '💎 Crystal fan'} — ${r.outcome}">
+      ${renderAlien(r.alien, 42)}
+      <div class="pip-dot ${r.outcome}"></div>
+    </div>`).join('');
+
+  // Insight box
+  const hardWrong = rushResults.filter(r =>
+    ['r9','r10'].includes(r.alien.id) && r.outcome !== 'correct'
+  );
+  document.getElementById('insight-box').innerHTML = `
+    <h3>What happened on the last two?</h3>
+    <p>${hardWrong.length > 0
+      ? 'Customers 9 and 10 were close to the boundary — one had a round body but otherwise looked like a crystal fan, the other had an angular body but mostly looked like a berry fan. Those edge cases trip most people up.'
+      : 'You handled the hard ones at the end — customers 9 and 10 had features that mostly pointed the wrong way. Solid pattern recognition.'
+    }</p>
+    <p>Notice how you got better as you went? You were building a picture from labeled examples and applying it to cases you\'d never seen before. That\'s exactly what a classifier does.</p>`;
+}
+
+/* ── Sort button (FLIP animation) ─────────────────── */
+
+function sortByClass() {
+  const grid = document.getElementById('breakdown-grid');
+  const items = [...grid.querySelectorAll('.breakdown-item')];
+  isSorted = !isSorted;
+
+  const btn = document.getElementById('sort-btn');
+  btn.textContent = isSorted ? 'Restore order' : 'Sort by class';
+
+  // Record starting positions
+  const startRects = items.map(el => el.getBoundingClientRect());
+
+  // Remove old group labels
+  grid.querySelectorAll('.group-label').forEach(el => el.remove());
+
+  if (isSorted) {
+    const berry   = items.filter(el => el.dataset.cls === 'berry');
+    const crystal = items.filter(el => el.dataset.cls === 'crystal');
+    grid.innerHTML = '';
+    const bl = makeGroupLabel('berry');
+    grid.appendChild(bl);
+    berry.forEach(el => grid.appendChild(el));
+    const cl = makeGroupLabel('crystal');
+    grid.appendChild(cl);
+    crystal.forEach(el => grid.appendChild(el));
+  } else {
+    const sorted = [...items].sort((a, b) => +a.dataset.idx - +b.dataset.idx);
+    grid.innerHTML = '';
+    sorted.forEach(el => grid.appendChild(el));
+  }
+
+  // FLIP: record end positions, apply inverse transform, then animate to identity
+  requestAnimationFrame(() => {
+    const endRects = items.map(el => el.getBoundingClientRect());
+    items.forEach((el, i) => {
+      const dx = startRects[i].left - endRects[i].left;
+      const dy = startRects[i].top  - endRects[i].top;
+      el.style.transition = 'none';
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
+    });
+    requestAnimationFrame(() => {
+      items.forEach(el => {
+        el.style.transition = 'transform 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        el.style.transform = '';
+      });
+    });
+  });
+}
+
+function makeGroupLabel(cls) {
+  const el = document.createElement('div');
+  el.className = `group-label ${cls}`;
+  el.textContent = cls === 'berry' ? '🫐 Berry fans' : '💎 Crystal fans';
+  return el;
+}
+
+/* ── Feature reveal ───────────────────────────────── */
+
+function revealFeature(feat) {
+  const btn = document.querySelector(`[data-feat="${feat}"]`);
+  if (btn.classList.contains('used')) return;
+  btn.classList.add('used');
+
+  const labels = FEATURE_LABELS[feat];
+
+  const classRows = ['berry', 'crystal'].map(cls => {
+    const data = featureData[feat][cls];
+    const total = Object.values(data).reduce((s, v) => s + v, 0);
+    const emoji = cls === 'berry' ? '🫐' : '💎';
+    const valRows = Object.entries(data)
+      .sort((a, b) => b[1] - a[1])
+      .map(([val, count]) => {
+        const pct = total > 0 ? Math.round(count / total * 100) : 0;
+        const lbl = labels[val] ?? val;
+        return `<div class="frc-val-row">
+          <span class="frc-val-name">${lbl}</span>
+          <div class="frc-bar-bg"><div class="frc-bar-fill ${cls}" data-pct="${pct}" style="width:0%"></div></div>
+          <span class="frc-val-count">${count}/${total}</span>
+        </div>`;
+      }).join('');
+    return `<div class="frc-class-row">
+      <span class="frc-emoji">${emoji}</span>
+      <div class="frc-vals">${valRows}</div>
+    </div>`;
+  }).join('');
+
+  // Compute insight: predictive only if top values differ AND each is clearly dominant (≥60%)
+  const berryTotal   = Object.values(featureData[feat].berry).reduce((s,v)=>s+v, 0);
+  const crystalTotal = Object.values(featureData[feat].crystal).reduce((s,v)=>s+v, 0);
+  const topBerry   = Object.entries(featureData[feat].berry).sort((a,b)=>b[1]-a[1])[0];
+  const topCrystal = Object.entries(featureData[feat].crystal).sort((a,b)=>b[1]-a[1])[0];
+  let insight = '';
+  if (topBerry && topCrystal) {
+    const bConc = topBerry[1]   / berryTotal;
+    const cConc = topCrystal[1] / crystalTotal;
+    const predictive = topBerry[0] !== topCrystal[0] && bConc >= 0.6 && cConc >= 0.6;
+    if (predictive) {
+      const bLbl = labels[topBerry[0]]   ?? topBerry[0];
+      const cLbl = labels[topCrystal[0]] ?? topCrystal[0];
+      const bPct = Math.round(bConc * 100);
+      const cPct = Math.round(cConc * 100);
+      insight = `<div class="frc-insight predictive">Useful — ${bLbl} goes with berry fans (${bPct}%), ${cLbl} goes with crystal fans (${cPct}%)</div>`;
+    } else {
+      insight = `<div class="frc-insight not-predictive">Not useful — both groups have similar distributions</div>`;
+    }
+  }
+
+  const card = document.createElement('div');
+  card.className = 'feature-reveal-card';
+  card.innerHTML = `<div class="frc-title">${FEATURE_NAMES[feat]}</div>${classRows}${insight}`;
+  card.style.cssText = 'opacity:0; transform:translateY(6px)';
+  document.getElementById('feature-reveals').appendChild(card);
+
+  requestAnimationFrame(() => {
+    card.style.transition = 'opacity 0.28s, transform 0.28s';
+    card.style.opacity = '1';
+    card.style.transform = 'none';
+    setTimeout(() => {
+      card.querySelectorAll('.frc-bar-fill').forEach(bar => {
+        bar.style.transition = 'width 0.55s ease';
+        bar.style.width = bar.dataset.pct + '%';
+      });
+    }, 180);
+  });
+}
+
+/* ════════════════════════════════════════════════════
+   CHECK-IN
+   ════════════════════════════════════════════════════ */
+
+let checkinRating = null;
+
+function selectRating(r) {
+  checkinRating = r;
+  document.querySelectorAll('.checkin-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelector(`.checkin-btn[onclick="selectRating('${r}')"]`).classList.add('selected');
+  document.getElementById('checkin-submit').removeAttribute('disabled');
+}
+
+function submitCheckin() {
+  const feedback = document.getElementById('checkin-feedback').value.trim();
+  Log.checkin(1, checkinRating, feedback);
+  State.setLevel(1, { checkin: { rating: checkinRating, feedback } });
+  window.location.href = 'reflection.html';
+}
+
+/* ════════════════════════════════════════════════════
+   MENU + THEME
+   ════════════════════════════════════════════════════ */
+
+function toggleMenu() { document.getElementById('menu-dropdown').classList.toggle('open'); }
+function openThemePicker() {
+  document.getElementById('menu-dropdown').classList.remove('open');
+  document.getElementById('theme-repicker').style.display = 'flex';
+}
+function closeThemePicker() { document.getElementById('theme-repicker').style.display = 'none'; }
+function switchTheme(name) { Themes.apply(name); closeThemePicker(); }
+function resetProgress() {
+  if (confirm('Reset all progress and start over?')) { State.reset(); window.location.href = 'index.html'; }
+}
+
+/* ════════════════════════════════════════════════════
+   TOOLTIP
+   ════════════════════════════════════════════════════ */
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.menu-wrap'))
+    document.getElementById('menu-dropdown').classList.remove('open');
+});
+
+/* ════════════════════════════════════════════════════
+   INIT
+   ════════════════════════════════════════════════════ */
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (!State.get('theme')) { window.location.href = 'index.html'; return; }
+  Themes.fromState();
+  State.ensureStarted();
+  buildScoreTrack();
+  showPhase('rush');
+
+  if (!State.get('level1IntroDismissed')) {
+    document.getElementById('intro-overlay').style.display = 'flex';
+  }
+});
+</script>
+</body>
+</html>

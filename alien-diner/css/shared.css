@@ -1,0 +1,336 @@
+/* ── Google Fonts ── */
+@import url('https://fonts.googleapis.com/css2?family=Boogaloo&family=Orbitron:wght@400;600;700;800&family=VT323&family=Press+Start+2P&display=swap');
+
+/* ════════════════════════════════════════════════════
+   THEME VARIABLES
+   ════════════════════════════════════════════════════ */
+
+/* Retro 50s American diner */
+.theme-diner {
+  --bg:          #fff8f0;
+  --surface:     #ffffff;
+  --border:      #f0d5bc;
+  --text:        #1a0800;
+  --muted:       #9c6b52;
+  --accent:      #e63946;
+  --success:     #2a9d4e;
+  --danger:      #e63946;
+  --vorb-clr:    #2563eb;
+  --glim-clr:    #ea580c;
+  --alien-body:  #5b9a7e;
+  --alien-stroke:#3d7a5f;
+  --font:        'Boogaloo', system-ui, sans-serif;
+  --radius:      6px;
+  --pulse-ring:  rgba(230, 57, 70, 0.5);
+}
+
+/* Deep space station */
+.theme-space {
+  --bg:          #05091a;
+  --surface:     #0d1635;
+  --border:      #1a3060;
+  --text:        #ddeeff;
+  --muted:       #4a6a90;
+  --accent:      #00d4ff;
+  --success:     #00ff9f;
+  --danger:      #ff4d6d;
+  --vorb-clr:    #00d4ff;
+  --glim-clr:    #c084fc;
+  --alien-body:  #22c55e;
+  --alien-stroke:#16a34a;
+  --font:        'Orbitron', system-ui, sans-serif;
+  --radius:      4px;
+  --pulse-ring:  rgba(0, 212, 255, 0.5);
+}
+
+/* Bioluminescent alien world */
+.theme-alien {
+  --bg:          #030d08;
+  --surface:     #071a10;
+  --border:      #0d3d20;
+  --text:        #7fffd4;
+  --muted:       #2e7d50;
+  --accent:      #39ff14;
+  --success:     #39ff14;
+  --danger:      #ff073a;
+  --vorb-clr:    #00ffee;
+  --glim-clr:    #ff00aa;
+  --alien-body:  #39ff14;
+  --alien-stroke:#1acc00;
+  --font:        'VT323', 'Courier New', monospace;
+  --radius:      0px;
+  --pulse-ring:  rgba(57, 255, 20, 0.5);
+}
+
+/* Retro arcade cabinet */
+.theme-arcade {
+  --bg:          #110022;
+  --surface:     #1c0038;
+  --border:      #3d0070;
+  --text:        #ffffff;
+  --muted:       #8855bb;
+  --accent:      #ff00cc;
+  --success:     #00ff66;
+  --danger:      #ff2200;
+  --vorb-clr:    #00ccff;
+  --glim-clr:    #ffaa00;
+  --alien-body:  #a855f7;
+  --alien-stroke:#7c3aed;
+  --font:        'Press Start 2P', monospace;
+  --radius:      0px;
+  --pulse-ring:  rgba(255, 0, 204, 0.5);
+}
+
+/* ════════════════════════════════════════════════════
+   RESET + BASE
+   ════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background:  var(--bg);
+  color:       var(--text);
+  font-family: var(--font);
+  min-height:  100vh;
+  transition:  background 0.3s, color 0.3s;
+}
+
+/* Press Start 2P is tiny at normal sizes — compensate */
+.theme-arcade { font-size: 13px; line-height: 1.8; }
+
+/* ════════════════════════════════════════════════════
+   THEME PICKER / OVERLAYS
+   ════════════════════════════════════════════════════ */
+
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.72);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200;
+}
+
+/* Picker card is always neutral white — readable before theme is chosen */
+.picker-card {
+  background: #fff; border-radius: 14px;
+  padding: 36px 40px; max-width: 500px; width: 90%;
+  text-align: center;
+  font-family: system-ui, sans-serif;
+  color: #1a1a2e;
+}
+.picker-card h1   { font-size: 1.6rem; margin-bottom: 6px; }
+.picker-card p    { color: #6b7280; margin-bottom: 24px; font-size: 0.95rem; line-height: 1.5; }
+
+.picker-options   { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.picker-btn {
+  padding: 14px 12px; border: 2px solid #e5e7eb; border-radius: 8px;
+  cursor: pointer; font-size: 0.88rem; font-weight: 600;
+  background: #fff; color: #1a1a2e;
+  transition: border-color 0.2s, transform 0.1s;
+}
+.picker-btn:hover { border-color: #6366f1; transform: translateY(-1px); }
+.picker-btn .theme-label { font-size: 0.8rem; color: #6b7280; margin-top: 2px; }
+
+.swatch { height: 36px; border-radius: 6px; margin-bottom: 8px; }
+.swatch-diner  { background: linear-gradient(135deg, #fff8f0 40%, #e63946); }
+.swatch-space  { background: linear-gradient(135deg, #05091a 40%, #00d4ff); }
+.swatch-alien  { background: linear-gradient(135deg, #030d08 40%, #39ff14); }
+.swatch-arcade { background: linear-gradient(135deg, #110022 40%, #ff00cc); }
+
+/* ── Intro / info card (themed) ── */
+.intro-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 36px 40px;
+  max-width: 540px; width: 90%; text-align: left; line-height: 1.7;
+}
+.intro-card h1  { font-size: 1.4rem; margin-bottom: 14px; }
+.intro-card p   { color: var(--muted); margin-bottom: 12px; font-size: 0.93rem; }
+.intro-card p:last-of-type { margin-bottom: 24px; }
+.intro-card strong { color: var(--text); }
+
+/* ════════════════════════════════════════════════════
+   APP SHELL
+   ════════════════════════════════════════════════════ */
+
+#app { display: flex; flex-direction: column; min-height: 100vh; }
+
+/* ── Header ── */
+header {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex; align-items: center; gap: 12px;
+}
+.header-title { font-size: 1rem; font-weight: 700; flex: 1; }
+.level-badge {
+  background: var(--accent); color: #fff;
+  font-size: 0.7rem; font-weight: 700;
+  padding: 3px 10px; border-radius: 20px; letter-spacing: 0.04em;
+}
+
+/* ── Step progress bar ── */
+.progress-bar-wrap { height: 4px; background: var(--border); }
+.progress-bar { height: 100%; background: var(--accent); transition: width 0.5s ease; }
+
+/* ── Main content ── */
+main {
+  flex: 1; padding: 24px;
+  max-width: 1100px; margin: 0 auto; width: 100%;
+}
+
+/* ════════════════════════════════════════════════════
+   BUTTONS
+   ════════════════════════════════════════════════════ */
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 22px; border: none; border-radius: var(--radius);
+  font-family: var(--font); font-size: 0.88rem; font-weight: 700;
+  cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+  text-decoration: none; letter-spacing: 0.02em;
+}
+.btn:hover  { opacity: 0.88; transform: translateY(-1px); }
+.btn:active { transform: translateY(0); opacity: 1; }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+.btn-primary   { background: var(--accent);  color: #fff; }
+.btn-success   { background: var(--success); color: #fff; }
+.btn-secondary { background: none; border: 1px solid var(--border); color: var(--text); }
+.btn-ghost     { background: none; border: none; color: var(--muted); font-size: 0.82rem; padding: 6px 10px; }
+.btn-ghost:hover { color: var(--text); opacity: 1; }
+
+/* Pulsing call-to-action */
+.btn-next {
+  background: var(--accent); color: #fff;
+  font-size: 0.95rem; padding: 13px 32px;
+  animation: pulse-glow 2s infinite;
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0   rgba(255,255,255,0.3); }
+  50%       { box-shadow: 0 0 0 10px rgba(255,255,255,0); }
+}
+
+/* ════════════════════════════════════════════════════
+   HEADER ICON BUTTONS + DROPDOWN
+   ════════════════════════════════════════════════════ */
+
+.icon-btn {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  cursor: pointer; padding: 6px 10px; border-radius: var(--radius);
+  font-size: 0.9rem; font-family: var(--font); line-height: 1;
+  transition: color 0.15s, border-color 0.15s;
+}
+.icon-btn:hover { color: var(--text); border-color: var(--accent); }
+
+.menu-wrap { position: relative; }
+.menu-dropdown {
+  display: none; position: absolute; right: 0; top: calc(100% + 6px);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); min-width: 160px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2); z-index: 50; overflow: hidden;
+}
+.menu-dropdown.open { display: block; }
+.menu-item {
+  display: block; width: 100%; text-align: left; background: none; border: none;
+  padding: 10px 16px; font-family: var(--font); font-size: 0.85rem;
+  color: var(--text); cursor: pointer;
+}
+.menu-item:hover { background: var(--bg); }
+.menu-item.danger { color: var(--danger); }
+.menu-divider { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+
+/* ════════════════════════════════════════════════════
+   TOOLTIP
+   ════════════════════════════════════════════════════ */
+
+.info-btn {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 1px solid var(--muted); background: none; color: var(--muted);
+  font-size: 0.62rem; font-weight: 700; font-style: italic;
+  font-family: Georgia, serif; cursor: pointer; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  vertical-align: middle; flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s;
+}
+.info-btn:hover { color: var(--text); border-color: var(--text); }
+
+#tooltip {
+  display: none; position: fixed; z-index: 400;
+  max-width: 260px; width: max-content;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 14px;
+  font-size: 0.82rem; line-height: 1.5; color: var(--text);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.22);
+  font-family: system-ui, sans-serif; /* always readable */
+}
+
+/* ════════════════════════════════════════════════════
+   SECTION LABELS + CARDS
+   ════════════════════════════════════════════════════ */
+
+.section-label {
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--muted); margin-bottom: 10px;
+  display: flex; align-items: center; gap: 6px;
+}
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px;
+}
+
+/* ════════════════════════════════════════════════════
+   ACCURACY BARS
+   ════════════════════════════════════════════════════ */
+
+.accuracy-row { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.accuracy-label { font-size: 0.82rem; width: 130px; color: var(--muted); }
+.accuracy-bar-bg { flex: 1; height: 12px; background: var(--border); border-radius: 6px; overflow: hidden; }
+.accuracy-bar { height: 100%; background: var(--success); border-radius: 6px; transition: width 0.7s ease; }
+.accuracy-pct { font-size: 0.82rem; font-weight: 700; width: 42px; text-align: right; }
+
+/* ════════════════════════════════════════════════════
+   CHECK-IN PULSE
+   ════════════════════════════════════════════════════ */
+
+.checkin-btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.checkin-btn {
+  padding: 10px 20px; border: 2px solid var(--border);
+  border-radius: var(--radius); background: var(--bg);
+  font-family: var(--font); font-size: 0.85rem; font-weight: 600;
+  color: var(--text); cursor: pointer; transition: all 0.15s;
+}
+.checkin-btn:hover    { border-color: var(--accent); }
+.checkin-btn.selected { border-color: var(--accent); background: var(--accent); color: #fff; }
+
+.checkin-feedback {
+  margin-top: 12px; width: 100%;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 14px;
+  font-family: var(--font); font-size: 0.85rem; color: var(--text);
+  resize: vertical; min-height: 72px;
+}
+.checkin-feedback:focus { outline: none; border-color: var(--accent); }
+
+/* ════════════════════════════════════════════════════
+   PLACEHOLDER PAGES
+   ════════════════════════════════════════════════════ */
+
+.placeholder-page {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; min-height: 100vh; gap: 16px;
+  text-align: center; padding: 24px;
+}
+.placeholder-page h1 { font-size: 2rem; }
+.placeholder-page p  { color: var(--muted); max-width: 400px; line-height: 1.6; }
+
+/* ════════════════════════════════════════════════════
+   RESPONSIVE
+   ════════════════════════════════════════════════════ */
+
+@media (max-width: 600px) {
+  main        { padding: 14px; }
+  header      { padding: 10px 14px; }
+  .picker-card { padding: 24px 18px; }
+  .intro-card  { padding: 24px 20px; }
+  .accuracy-label { width: 90px; font-size: 0.75rem; }
+  .theme-arcade { font-size: 11px; }
+}

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alien Diner</title>
+<link rel="stylesheet" href="css/shared.css">
+<style>
+  #app { display: none; }
+</style>
+</head>
+<body class="theme-diner">
+
+<!-- ── Theme picker ───────────────────────────────── -->
+<div class="overlay" id="theme-overlay">
+  <div class="picker-card">
+    <h1>🍽️ Alien Diner</h1>
+    <p>Pick a visual style to get started.<br>You can switch any time from the menu.</p>
+    <div class="picker-options">
+
+      <button class="picker-btn" onclick="pickTheme('diner')">
+        <div class="swatch swatch-diner"></div>
+        <div><strong>Diner</strong></div>
+        <div class="theme-label">Retro 50s</div>
+      </button>
+
+      <button class="picker-btn" onclick="pickTheme('space')">
+        <div class="swatch swatch-space"></div>
+        <div><strong>Space</strong></div>
+        <div class="theme-label">Deep Station</div>
+      </button>
+
+      <button class="picker-btn" onclick="pickTheme('alien')">
+        <div class="swatch swatch-alien"></div>
+        <div><strong>Alien</strong></div>
+        <div class="theme-label">Bioluminescent</div>
+      </button>
+
+      <button class="picker-btn" onclick="pickTheme('arcade')">
+        <div class="swatch swatch-arcade"></div>
+        <div><strong>Arcade</strong></div>
+        <div class="theme-label">Retro Cabinet</div>
+      </button>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── App shell (fallback if redirect fails) ─────── -->
+<div id="app">
+  <p style="padding:40px;text-align:center;color:var(--muted);">Loading…</p>
+</div>
+
+<script src="js/state.js"></script>
+<script src="js/log.js"></script>
+<script src="js/themes.js"></script>
+<script>
+  function pickTheme(name) {
+    State.ensureStarted();
+    Themes.apply(name);
+    State.set('introSeen', true);
+    Log.sessionStart(name);
+    window.location.href = 'level1.html';
+  }
+
+  // Returning student — skip straight to level 1
+  (function init() {
+    if (State.get('introSeen') && State.get('theme')) {
+      window.location.href = 'level1.html';
+    }
+  })();
+</script>
+</body>
+</html>

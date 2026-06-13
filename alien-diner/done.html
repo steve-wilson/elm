@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alien Diner – Done</title>
+<link rel="stylesheet" href="css/shared.css">
+</head>
+<body>
+<div id="app">
+  <header>
+    <span class="header-title">Alien Diner</span>
+    <span class="level-badge">Done</span>
+  </header>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar" style="width:100%"></div>
+  </div>
+  <main>
+    <div class="placeholder-page">
+      <h1>You're done!</h1>
+      <p>Thanks for completing Alien Diner. Download your interaction log below to submit.</p>
+      <button class="btn btn-primary" onclick="downloadLog()">Download log →</button>
+    </div>
+  </main>
+</div>
+<script src="js/state.js"></script>
+<script src="js/log.js"></script>
+<script src="js/themes.js"></script>
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    if (!State.get('theme')) { window.location.href = 'index.html'; return; }
+    Themes.fromState();
+    State.set('completedAt', new Date().toISOString());
+  });
+
+  function downloadLog() {
+    Log.download();
+  }
+</script>
+</body>
+</html>
