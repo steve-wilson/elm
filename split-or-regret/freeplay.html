@@ -1785,7 +1785,8 @@ function confirmReveal() {
   if (pendingRevealIdx < 0) return;
   const idx = pendingRevealIdx;
   const ms  = mSt[idx];
-  ms.testAcc   = computeTestAcc(ms.valAcc);
+  const rawTest = computeTestAcc(ms.valAcc);
+  ms.testAcc    = ds().id === 3 ? computeRealWorldAcc(rawTest) : rawTest;
   ms.lockedIn  = true;
   ms.lockedHp1 = ms.hp1;
   ms.lockedHp2 = hasHp2(idx) ? ms.hp2 : null;
