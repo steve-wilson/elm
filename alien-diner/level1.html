@@ -82,6 +82,29 @@
 .food-emoji { font-size: 2.2rem; line-height: 1; }
 .food-name  { font-weight: 700; font-size: 0.9rem; }
 
+/* Speech bubble */
+.speech-bubble {
+  position: absolute; bottom: 152px; left: calc(50% + 32px);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 5px 11px;
+  font-size: 0.75rem; white-space: nowrap; pointer-events: none; z-index: 5;
+  animation: bubble-float 3.5s ease-out forwards;
+}
+.speech-bubble::after {
+  content: ''; position: absolute; bottom: 10px; left: -9px;
+  border: 5px solid transparent; border-right-color: var(--border);
+}
+.speech-bubble::before {
+  content: ''; position: absolute; bottom: 11px; left: -6px; z-index: 1;
+  border: 4px solid transparent; border-right-color: var(--surface);
+}
+@keyframes bubble-float {
+  0%   { opacity: 0; transform: translateY(4px); }
+  10%  { opacity: 1; transform: translateY(0); }
+  70%  { opacity: 1; transform: translateY(-10px); }
+  100% { opacity: 0; transform: translateY(-18px); }
+}
+
 /* Score track */
 .score-track {
   display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
@@ -139,6 +162,16 @@
 }
 .group-label.berry   { color: var(--vorb-clr); margin-top: 4px; }
 .group-label.crystal { color: var(--glim-clr); margin-top: 10px; }
+
+/* Sort button attention pulse */
+@keyframes sort-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--pulse-ring, rgba(99,102,241,0.45)); border-color: var(--accent); }
+  55%       { box-shadow: 0 0 0 7px transparent; border-color: var(--accent); }
+}
+.sort-btn-pulse {
+  border-color: var(--accent) !important;
+  animation: sort-pulse 2s ease-in-out infinite;
+}
 
 /* Feature pick buttons */
 .feature-pick-row {
@@ -297,18 +330,15 @@
       <!-- Interactive feature reveal -->
       <div class="result-card">
         <h3 style="margin-bottom:6px">Which features actually matter?</h3>
-        <p style="font-size:0.83rem; color:var(--muted)">Pick a feature to see how it was distributed across the two groups.</p>
+        <p id="feature-prompt" style="font-size:0.83rem; color:var(--muted); margin-bottom:14px">Which feature do you think matters most?</p>
         <div class="feature-pick-row" id="feature-pick-row">
-          <button class="feat-pick-btn" data-feat="body"    onclick="revealFeature('body')">Body shape</button>
-          <button class="feat-pick-btn" data-feat="eyes"    onclick="revealFeature('eyes')">Eyes</button>
-          <button class="feat-pick-btn" data-feat="legs"    onclick="revealFeature('legs')">Legs</button>
-          <button class="feat-pick-btn" data-feat="texture" onclick="revealFeature('texture')">Texture</button>
-          <button class="feat-pick-btn" data-feat="color"   onclick="revealFeature('color')">Color</button>
+          <button class="feat-pick-btn" data-feat="body"  onclick="revealFeature('body')">Body shape</button>
+          <button class="feat-pick-btn" data-feat="eyes"  onclick="revealFeature('eyes')">Eyes</button>
+          <button class="feat-pick-btn" data-feat="legs"  onclick="revealFeature('legs')">Legs</button>
+          <button class="feat-pick-btn" data-feat="color" onclick="revealFeature('color')">Color</button>
         </div>
         <div id="feature-reveals"></div>
       </div>
-
-      <div class="insight-box" id="insight-box"></div>
 
       <button class="btn btn-next" onclick="showPhase('checkin')">Quick check-in →</button>
     </div><!-- /phase-results -->
@@ -363,17 +393,22 @@
 
 // trueLabel: food the alien prefers ('berry' | 'crystal')
 // color: decorative — evenly split across both classes, not predictive
+//
+// TRUE rule: 1 eye → berry, 2 eyes → crystal (eyes is 5/5 perfect across all 10)
+// Body shape agrees with eyes on customers 1–8, so players can't tell which is better.
+// Customers 9–10 break the body/eye correlation — body gives the "wrong" answer, eyes the right one.
+// This teaches that eyes was the real signal all along; body shape was a correlated but imperfect proxy.
 const RUSH_ALIENS = [
-  { id:'r1',  body:'round',   eyes:1, legs:2, texture:'spots',   color:'green',  trueLabel:'berry'   }, // easy
-  { id:'r2',  body:'angular', eyes:2, legs:4, texture:'stripes', color:'purple', trueLabel:'crystal' }, // easy
-  { id:'r3',  body:'angular', eyes:2, legs:4, texture:'stripes', color:'orange', trueLabel:'crystal' }, // easy — two crystals in a row
-  { id:'r4',  body:'round',   eyes:1, legs:2, texture:'spots',   color:'purple', trueLabel:'berry'   }, // easy
-  { id:'r5',  body:'angular', eyes:2, legs:2, texture:'stripes', color:'pink',   trueLabel:'crystal' }, // medium — unusual legs
-  { id:'r6',  body:'round',   eyes:1, legs:4, texture:'spots',   color:'cyan',   trueLabel:'berry'   }, // medium — unusual legs
-  { id:'r7',  body:'round',   eyes:2, legs:2, texture:'spots',   color:'orange', trueLabel:'berry'   }, // medium — unusual eyes
-  { id:'r8',  body:'angular', eyes:1, legs:4, texture:'stripes', color:'green',  trueLabel:'crystal' }, // medium — unusual eyes
-  { id:'r9',  body:'round',   eyes:2, legs:4, texture:'stripes', color:'pink',   trueLabel:'berry'   }, // hard — 3 of 4 features look crystal
-  { id:'r10', body:'angular', eyes:1, legs:2, texture:'spots',   color:'cyan',   trueLabel:'crystal' }, // hard — 3 of 4 features look berry
+  { id:'r1',  body:'round',   eyes:1, legs:2, color:'green',  trueLabel:'berry'   }, // easy — body+eyes+legs all align
+  { id:'r2',  body:'angular', eyes:2, legs:4, color:'purple', trueLabel:'crystal' }, // easy — body+eyes+legs all align
+  { id:'r3',  body:'angular', eyes:2, legs:4, color:'orange', trueLabel:'crystal' }, // easy — two crystals in a row
+  { id:'r4',  body:'round',   eyes:1, legs:2, color:'purple', trueLabel:'berry'   }, // easy — body+eyes+legs all align
+  { id:'r5',  body:'angular', eyes:2, legs:2, color:'pink',   trueLabel:'crystal' }, // medium — legs unusual, body+eyes agree
+  { id:'r6',  body:'round',   eyes:1, legs:4, color:'cyan',   trueLabel:'berry'   }, // medium — legs unusual, body+eyes agree
+  { id:'r7',  body:'angular', eyes:2, legs:2, color:'green',  trueLabel:'crystal' }, // medium — legs unusual, body+eyes agree
+  { id:'r8',  body:'round',   eyes:1, legs:4, color:'orange', trueLabel:'berry'   }, // medium — legs unusual, body+eyes agree
+  { id:'r9',  body:'angular', eyes:1, legs:2, color:'pink',   trueLabel:'berry'   }, // hard — body says crystal (WRONG), eyes+legs say berry (right)
+  { id:'r10', body:'round',   eyes:2, legs:4, color:'cyan',   trueLabel:'crystal' }, // hard — body says berry (WRONG), eyes+legs say crystal (right)
 ];
 
 const ALIEN_COLORS = {
@@ -385,16 +420,37 @@ const ALIEN_COLORS = {
 };
 
 const FEATURE_LABELS = {
-  body:    { round:'Round', angular:'Angular' },
-  eyes:    { 1:'1 eye', 2:'2 eyes' },
-  legs:    { 2:'2 legs', 4:'4 legs' },
-  texture: { spots:'Spots', stripes:'Stripes' },
-  color:   { green:'Green', purple:'Purple', orange:'Orange', pink:'Pink', cyan:'Cyan' },
+  body:  { round:'Round', angular:'Angular' },
+  eyes:  { 1:'1 eye', 2:'2 eyes' },
+  legs:  { 2:'2 legs', 4:'4 legs' },
+  color: { green:'Green', purple:'Purple', orange:'Orange', pink:'Pink', cyan:'Cyan' },
 };
 
-const FEATURE_NAMES = { body:'Body shape', eyes:'Eyes', legs:'Legs', texture:'Texture', color:'Color' };
+const FEATURE_NAMES = { body:'Body shape', eyes:'Eyes', legs:'Legs', color:'Color' };
 
 const PATIENCE_SECONDS = 6;
+
+const ALIEN_MESSAGES = [
+  "I'm starving!", "What's on the menu?", "Table for one",
+  "I traveled light-years for this", "Feed me!", "My antennae are tingling",
+  "Any specials today?", "First time here", "I'm a regular",
+  "What do you recommend?", "My stomach is growling", "I've heard great things",
+  "Do you take cosmic credits?", "I come in peace… and hunger",
+  "Any day now…", "Smells incredible in here", "Critical hunger level",
+  "I have a reservation", "Ready to order", "What's fresh?",
+  "Is the chef in?", "Running on empty", "My home planet has worse food",
+  "Worth the warp", "Are you the server?", "Peckish",
+  "Very peckish", "Extremely peckish", "Chef's choice, please",
+  "Surprise me", "I always order the same thing", "Make it snappy",
+  "I've got places to be", "Just a quick bite", "My species loves this place",
+  "Best in the sector, I hope", "Don't let me down", "Whatever smells good",
+  "No rush — actually, hurry", "Hello? Anyone there?", "Tick tock…",
+  "Nutrition needed urgently", "My legs are tired and my stomach is empty",
+  "Galaxy's finest, I hope", "Just browsing… no wait, starving",
+  "I've been thinking about this all day", "Do you have a loyalty card?",
+  "Last stop before the void", "My eyes are bigger than my stomach",
+  "Table for one, party of me",
+];
 
 const TOOLTIPS = {
   feature_inventory: 'After each customer leaves, this panel updates with what you now know about them.',
@@ -414,13 +470,6 @@ function renderAlien(f, px = 80) {
   const body = f.body === 'round'
     ? `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${BC}" stroke="${SC}" stroke-width="1.5"/>`
     : `<polygon points="${cx},${cy-ry-4} ${cx+rx+4},${cy} ${cx},${cy+ry+4} ${cx-rx-4},${cy}" fill="${BC}" stroke="${SC}" stroke-width="1.5"/>`;
-
-  const tex = f.texture === 'spots'
-    ? `<circle cx="${(cx-rx*.38)|0}" cy="${(cy-ry*.18)|0}" r="${(px*.07)|0}" fill="white" opacity="0.22"/>
-       <circle cx="${(cx+rx*.28)|0}" cy="${(cy+ry*.28)|0}" r="${(px*.055)|0}" fill="white" opacity="0.18"/>
-       <circle cx="${(cx-rx*.08)|0}" cy="${(cy+ry*.55)|0}" r="${(px*.045)|0}" fill="white" opacity="0.15"/>`
-    : `<line x1="${cx-rx+6}" y1="${(cy-ry*.15)|0}" x2="${cx+rx-6}" y2="${(cy-ry*.15)|0}" stroke="white" stroke-width="2.5" opacity="0.22"/>
-       <line x1="${cx-rx+12}" y1="${(cy+ry*.32)|0}" x2="${cx+rx-12}" y2="${(cy+ry*.32)|0}" stroke="white" stroke-width="2" opacity="0.16"/>`;
 
   const ey = (cy - ry * .1) | 0;
   let eyes;
@@ -457,7 +506,7 @@ function renderAlien(f, px = 80) {
   const ant = `<line x1="${cx}" y1="${cy-ry-2}" x2="${atx}" y2="${aty}" stroke="${BC}" stroke-width="2" stroke-linecap="round"/>
                <circle cx="${atx}" cy="${aty}" r="3" fill="${BC}"/>`;
 
-  return `<svg viewBox="0 0 ${px} ${h}" width="${px}" height="${h}" aria-hidden="true">${body}${tex}${eyes}${legs}${ant}</svg>`;
+  return `<svg viewBox="0 0 ${px} ${h}" width="${px}" height="${h}" aria-hidden="true">${body}${eyes}${legs}${ant}</svg>`;
 }
 
 /* ════════════════════════════════════════════════════
@@ -482,6 +531,9 @@ let patienceTimer = null;
 let missTimer = null;
 let customerStartTime = null;
 let foodLocked = false;
+let alienOnStage = false;   // true once entry animation completes
+let stageTimer = null;      // setTimeout that sets alienOnStage = true
+let speechBubble = null;    // current floating speech bubble element
 
 function beginRush() {
   if (rushStarted) return;
@@ -514,7 +566,9 @@ function nextCustomer() {
   walker.querySelectorAll('.reaction-badge').forEach(b => b.remove());
   document.getElementById('walker-svg').innerHTML = renderAlien(alien, 100);
 
-  // Snap offstage right, then walk in (reset any transition override from the fast exit)
+  // Snap offstage right, then walk in
+  alienOnStage = false;
+  clearTimeout(stageTimer);
   walker.style.transition = 'none';
   walker.classList.remove('on-stage', 'off-left');
   walker.classList.add('off-right');
@@ -522,6 +576,15 @@ function nextCustomer() {
     walker.style.transition = '';
     walker.classList.remove('off-right');
     walker.classList.add('on-stage');
+    stageTimer = setTimeout(() => { alienOnStage = true; }, 1450);
+
+    // Speech bubble floats up as alien walks in
+    if (speechBubble) { speechBubble.remove(); speechBubble = null; }
+    speechBubble = document.createElement('div');
+    speechBubble.className = 'speech-bubble';
+    speechBubble.textContent = ALIEN_MESSAGES[Math.floor(Math.random() * ALIEN_MESSAGES.length)];
+    document.getElementById('diner-stage').appendChild(speechBubble);
+    setTimeout(() => { if (speechBubble) { speechBubble.remove(); speechBubble = null; } }, 3600);
   }));
 
   // Reset patience bar
@@ -557,6 +620,8 @@ function stopPatience() {
 function serveFood(choice) {
   if (foodLocked) return;
   foodLocked = true;
+  clearTimeout(stageTimer);
+  if (speechBubble) { speechBubble.remove(); speechBubble = null; }
   stopPatience();
 
   const alien = RUSH_ALIENS[rushIdx];
@@ -567,12 +632,15 @@ function serveFood(choice) {
   showReaction(correct);
   recordResult(correct ? 'correct' : 'wrong', alien, choice, reactionMs);
 
-  setTimeout(advanceCustomer, 700);
+  // If alien hasn't finished walking in, zip them off almost immediately
+  setTimeout(advanceCustomer, alienOnStage ? 700 : 380);
 }
 
 function missCustomer() {
   if (foodLocked) return;
   foodLocked = true;
+  clearTimeout(stageTimer);
+  if (speechBubble) { speechBubble.remove(); speechBubble = null; }
   stopPatience();
 
   const alien = RUSH_ALIENS[rushIdx];
@@ -634,6 +702,11 @@ function recordResult(outcome, alien, studentChoice, reactionMs) {
 
 let featureData = {};
 let isSorted = false;
+let rankOrder = [];       // features sorted by predictiveness, computed after rush
+let currentQuestion = 0;  // which ranking question we're on (0=most, 1=second, 2=third, 3+=free)
+let correctlyRanked = new Set();
+let visitedFeats = new Set();
+const MAX_QUESTIONS = 3;
 
 function endRush() {
   const nCorrect = rushResults.filter(r => r.outcome === 'correct').length;
@@ -641,17 +714,33 @@ function endRush() {
   Log.rushComplete({ studentAccuracy: acc, modelAccuracy: null, agreementRate: null });
   State.setLevel(1, { completed: true, studentAccuracy: acc });
   buildFeatureData();
+  buildRankOrder();
   buildResults(nCorrect, acc);
   showPhase('results');
+  document.getElementById('sort-btn').classList.add('sort-btn-pulse');
+}
+
+function buildRankOrder() {
+  rankOrder = Object.keys(featureData).map(feat => {
+    const bTotal = Object.values(featureData[feat].berry).reduce((s,v)=>s+v, 0);
+    const cTotal = Object.values(featureData[feat].crystal).reduce((s,v)=>s+v, 0);
+    const topB = Object.entries(featureData[feat].berry).sort((a,b)=>b[1]-a[1])[0];
+    const topC = Object.entries(featureData[feat].crystal).sort((a,b)=>b[1]-a[1])[0];
+    const score = (topB && topC && topB[0] !== topC[0])
+      ? Math.min(topB[1]/bTotal, topC[1]/cTotal) : 0;
+    return { feat, score };
+  }).filter(x => x.score > 0)
+    .sort((a,b) => b.score - a.score)
+    .map(x => x.feat);
 }
 
 function buildFeatureData() {
-  ['body','eyes','legs','texture','color'].forEach(feat => {
+  ['body','eyes','legs','color'].forEach(feat => {
     featureData[feat] = { berry: {}, crystal: {} };
   });
   rushResults.forEach(({ alien }) => {
     const cls = alien.trueLabel;
-    ['body','eyes','legs','texture','color'].forEach(feat => {
+    ['body','eyes','legs','color'].forEach(feat => {
       const val = String(alien[feat]);
       featureData[feat][cls][val] = (featureData[feat][cls][val] || 0) + 1;
     });
@@ -679,17 +768,6 @@ function buildResults(nCorrect, acc) {
       <div class="pip-dot ${r.outcome}"></div>
     </div>`).join('');
 
-  // Insight box
-  const hardWrong = rushResults.filter(r =>
-    ['r9','r10'].includes(r.alien.id) && r.outcome !== 'correct'
-  );
-  document.getElementById('insight-box').innerHTML = `
-    <h3>What happened on the last two?</h3>
-    <p>${hardWrong.length > 0
-      ? 'Customers 9 and 10 were close to the boundary — one had a round body but otherwise looked like a crystal fan, the other had an angular body but mostly looked like a berry fan. Those edge cases trip most people up.'
-      : 'You handled the hard ones at the end — customers 9 and 10 had features that mostly pointed the wrong way. Solid pattern recognition.'
-    }</p>
-    <p>Notice how you got better as you went? You were building a picture from labeled examples and applying it to cases you\'d never seen before. That\'s exactly what a classifier does.</p>`;
 }
 
 /* ── Sort button (FLIP animation) ─────────────────── */
@@ -700,7 +778,8 @@ function sortByClass() {
   isSorted = !isSorted;
 
   const btn = document.getElementById('sort-btn');
-  btn.textContent = isSorted ? 'Restore order' : 'Sort by class';
+  btn.classList.remove('sort-btn-pulse');
+  btn.textContent = isSorted ? 'Original order' : 'Sort by class';
 
   // Record starting positions
   const startRects = items.map(el => el.getBoundingClientRect());
@@ -757,7 +836,58 @@ function revealFeature(feat) {
   document.querySelectorAll('.feat-pick-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('feature-reveals').innerHTML = '';
+  renderFeatureCard(feat);
 
+  // Ranking logic: only applies to first-time visits of un-ranked features
+  if (currentQuestion < MAX_QUESTIONS && !correctlyRanked.has(feat)) {
+    const isNew = !visitedFeats.has(feat);
+    visitedFeats.add(feat);
+    if (feat === rankOrder[currentQuestion]) {
+      correctlyRanked.add(feat);
+      currentQuestion++;
+      setPrompt(correctPromptText(feat, currentQuestion));
+    } else if (isNew) {
+      setPrompt(wrongPromptText(feat, currentQuestion));
+    }
+  } else {
+    visitedFeats.add(feat);
+  }
+}
+
+function setPrompt(text) {
+  document.getElementById('feature-prompt').textContent = text;
+}
+
+function correctPromptText(feat, newQ) {
+  const more = newQ < MAX_QUESTIONS;
+  const next = ['second', 'third'][newQ - 1];
+  if (feat === 'eyes')
+    return more
+      ? `Exactly — eye count perfectly predicts food preference across all 10 customers. Which is the ${next} most useful feature?`
+      : 'Exactly — eye count is the most predictive feature. Explore the rest freely.';
+  if (feat === 'body')
+    return more
+      ? `Right — body shape is strong but breaks on a couple of customers. What's the ${next} most useful feature?`
+      : 'Right — body shape is strong but not perfect. Explore the remaining features.';
+  if (feat === 'legs')
+    return 'Yes — legs shows a weak but real pattern too. Take a look at the last feature to see why it doesn\'t help.';
+  return more
+    ? `Correct! Which is the ${next} most useful feature?`
+    : 'You\'ve found the top features. Explore the rest freely.';
+}
+
+function wrongPromptText(feat, questionIdx) {
+  const isUseful = rankOrder.includes(feat);
+  if (!isUseful) {
+    return 'Color looks the same in both groups — take a look at the bars. Try one of the other features.';
+  }
+  if (questionIdx === 0) {
+    return `${FEATURE_NAMES[feat]} has real signal — but one feature is even more reliable. Which feature never gets it wrong across all 10 customers?`;
+  }
+  return `${FEATURE_NAMES[feat]} matters, but there\'s a stronger feature you haven\'t found yet. Take a look and try again.`;
+}
+
+function renderFeatureCard(feat) {
   const labels = FEATURE_LABELS[feat];
 
   const classRows = ['berry', 'crystal'].map(cls => {
@@ -781,24 +911,21 @@ function revealFeature(feat) {
     </div>`;
   }).join('');
 
-  // Compute insight: predictive only if top values differ AND each is clearly dominant (≥60%)
   const berryTotal   = Object.values(featureData[feat].berry).reduce((s,v)=>s+v, 0);
   const crystalTotal = Object.values(featureData[feat].crystal).reduce((s,v)=>s+v, 0);
   const topBerry   = Object.entries(featureData[feat].berry).sort((a,b)=>b[1]-a[1])[0];
   const topCrystal = Object.entries(featureData[feat].crystal).sort((a,b)=>b[1]-a[1])[0];
   let insight = '';
   if (topBerry && topCrystal) {
-    const bConc = topBerry[1]   / berryTotal;
+    const bConc = topBerry[1] / berryTotal;
     const cConc = topCrystal[1] / crystalTotal;
     const predictive = topBerry[0] !== topCrystal[0] && bConc >= 0.6 && cConc >= 0.6;
     if (predictive) {
-      const bLbl = labels[topBerry[0]]   ?? topBerry[0];
-      const cLbl = labels[topCrystal[0]] ?? topCrystal[0];
       const bPct = Math.round(bConc * 100);
       const cPct = Math.round(cConc * 100);
-      insight = `<div class="frc-insight predictive">Useful — ${bLbl} goes with berry fans (${bPct}%), ${cLbl} goes with crystal fans (${cPct}%)</div>`;
+      insight = `<div class="frc-insight predictive">${labels[topBerry[0]] ?? topBerry[0]} → berry fans (${bPct}%) · ${labels[topCrystal[0]] ?? topCrystal[0]} → crystal fans (${cPct}%)</div>`;
     } else {
-      insight = `<div class="frc-insight not-predictive">Not useful — both groups have similar distributions</div>`;
+      insight = `<div class="frc-insight not-predictive">Both groups look the same — this feature doesn't help</div>`;
     }
   }
 
