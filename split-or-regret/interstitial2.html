@@ -187,7 +187,7 @@
 const VISUALS = [
   // Q1: more training data → better model
   `<div class="q-vis">
-    <div class="vis-title">Effect of training data on the model</div>
+    <div class="vis-title">Your two Level 2 runs</div>
     <div class="split-cmp">
       <div class="split-row">
         <div class="split-lbl">More training data</div>
@@ -195,7 +195,6 @@ const VISUALS = [
           <div class="split-train" style="flex:8"></div>
           <div class="split-test"  style="flex:2"></div>
         </div>
-        <div class="split-note" style="color:#10b981">↑ better model</div>
       </div>
       <div class="split-row">
         <div class="split-lbl" style="color:#9ca3af">Less training data</div>
@@ -203,14 +202,13 @@ const VISUALS = [
           <div class="split-train" style="flex:5"></div>
           <div class="split-test"  style="flex:5"></div>
         </div>
-        <div class="split-note">↓ weaker model</div>
       </div>
     </div>
   </div>`,
 
   // Q2: more test data → reliable estimate
   `<div class="q-vis">
-    <div class="vis-title">Effect of test set size on the estimate</div>
+    <div class="vis-title">Two ways to split the same data</div>
     <div class="split-cmp">
       <div class="split-row">
         <div class="split-lbl">Small test set</div>
@@ -218,7 +216,6 @@ const VISUALS = [
           <div class="split-train" style="flex:9"></div>
           <div class="split-test"  style="flex:1"></div>
         </div>
-        <div class="split-note">noisy estimate ±10%</div>
       </div>
       <div class="split-row">
         <div class="split-lbl" style="color:#f97316">Larger test set</div>
@@ -226,14 +223,13 @@ const VISUALS = [
           <div class="split-train" style="flex:7"></div>
           <div class="split-test"  style="flex:3"></div>
         </div>
-        <div class="split-note" style="color:#f97316">reliable estimate ±3%</div>
       </div>
     </div>
   </div>`,
 
   // Q3: common splits — 80/20 is the standard
   `<div class="q-vis">
-    <div class="vis-title">Common train / test splits</div>
+    <div class="vis-title">Three possible train / test splits</div>
     <div class="three-opts">
       <div class="three-row">
         <div class="three-lbl">50 / 50</div>
@@ -243,13 +239,13 @@ const VISUALS = [
         </div>
         <div class="three-note">trains on half</div>
       </div>
-      <div class="three-row highlight">
+      <div class="three-row">
         <div class="three-lbl">80 / 20</div>
         <div class="split-bar" style="flex:1">
           <div class="split-train" style="flex:4"></div>
           <div class="split-test"  style="flex:1"></div>
         </div>
-        <div class="three-note">most common ✓</div>
+        <div class="three-note">trains on ⅘</div>
       </div>
       <div class="three-row">
         <div class="three-lbl">99 / 1</div>
@@ -279,7 +275,6 @@ const VISUALS = [
         <div class="peek-text">Checked test score on model γ — 79%. Looked good enough to deploy.</div>
       </div>
     </div>
-    <div class="peek-consequence">Each test score guided your next move — so by the end, the test set had quietly shaped every decision you made.</div>
   </div>`,
 ];
 
