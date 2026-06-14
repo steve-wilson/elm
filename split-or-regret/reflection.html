@@ -220,10 +220,10 @@
 Themes.fromState();
 
 const MODEL_SETS = {
-  greek:     ['α','β','γ','δ','ε','ζ'],
-  animals:   ['🦊','🐺','🐻','🦅','🦈','🐯'],
-  zodiac:    ['♈','♉','♊','♋','♌','♍'],
-  realistic: ['SVM','RandForest','GradBoost','NeuralNet','KNN','NaiveBayes'],
+  greek:     ['α','β','γ','δ'],
+  animals:   ['🦊','🐺','🐻','🦅'],
+  zodiac:    ['♈','♉','♊','♋'],
+  realistic: ['SVM','RandForest','GradBoost','NeuralNet'],
 };
 
 function getModelName(idx) {
@@ -312,9 +312,7 @@ function buildL3Stats() {
       .slice(-1)[0];
     if (revealEv) {
       valPct = Math.round(revealEv.valAcc * 100) + '%';
-      hpStr  = revealEv.hp2 != null
-        ? `HP1: ${revealEv.hp1} · HP2: ${revealEv.hp2}`
-        : `HP1: ${revealEv.hp1}`;
+      hpStr  = `HP: ${revealEv.hp1}`;
     }
   }
 

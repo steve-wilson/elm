@@ -171,7 +171,7 @@
   /* ── Per-model run history ── */
   .mhist-row {
     display: grid;
-    grid-template-columns: 20px 1fr 1fr 40px 40px;
+    grid-template-columns: 20px 1fr 40px 40px;
     gap: 5px; align-items: center;
     padding: 7px 10px; margin-bottom: 5px;
     border-radius: calc(var(--radius) / 1.5);
@@ -416,37 +416,29 @@
 <script>
 // ── Model & HP config ─────────────────────────────────────────────────────────
 const MODEL_NAMES = {
-  greek:     ['α','β','γ','δ','ε','ζ'],
-  animals:   ['🦊','🐺','🐻','🦅','🦈','🐯'],
-  zodiac:    ['♈','♉','♊','♋','♌','♍'],
-  realistic: ['SVM','RandForest','GradBoost','NeuralNet','KNN','NaiveBayes'],
+  greek:     ['α','β','γ','δ'],
+  animals:   ['🦊','🐺','🐻','🦅'],
+  zodiac:    ['♈','♉','♊','♋'],
+  realistic: ['SVM','RandForest','GradBoost','NeuralNet'],
 };
 
 const HP_CONFIG = [
-  { greek:    { hp1:'Magnitude',          hp2:'Convergence'      },
-    animals:  { hp1:'Cunning',            hp2:'Agility'          },
-    zodiac:   { hp1:'Intensity',          hp2:'Impulsiveness'    },
-    realistic:{ hp1:'Regularization (C)', hp2:'Kernel Width (γ)' } },
-  { greek:    { hp1:'Sensitivity',        hp2:'Threshold'        },
-    animals:  { hp1:'Pack Size',          hp2:'Aggression'       },
-    zodiac:   { hp1:'Stubbornness',       hp2:'Patience'         },
-    realistic:{ hp1:'Trees',              hp2:'Max Depth'        } },
-  { greek:    { hp1:'Curvature',          hp2:'Decay'            },
-    animals:  { hp1:'Hibernation',        hp2:'Foraging Range'   },
-    zodiac:   { hp1:'Adaptability',       hp2:'Inconsistency'    },
-    realistic:{ hp1:'Learning Rate',      hp2:'Estimators'       } },
-  { greek:    { hp1:'Step Size',          hp2:'Momentum'         },
-    animals:  { hp1:'Wingspan',           hp2:'Dive Speed'       },
-    zodiac:   { hp1:'Intuition',          hp2:'Sensitivity'      },
-    realistic:{ hp1:'Learning Rate',      hp2:'Hidden Layers'    } },
-  { greek:    { hp1:'Tolerance',          hp2:null },
-    animals:  { hp1:'Bite Force',         hp2:null },
-    zodiac:   { hp1:'Confidence',         hp2:null },
-    realistic:{ hp1:'K (Neighbors)',      hp2:null } },
-  { greek:    { hp1:'Amplitude',          hp2:null },
-    animals:  { hp1:'Ferocity',           hp2:null },
-    zodiac:   { hp1:'Precision',          hp2:null },
-    realistic:{ hp1:'Smoothing (α)',      hp2:null } },
+  { greek:    { hp1:'Magnitude'          },
+    animals:  { hp1:'Cunning'            },
+    zodiac:   { hp1:'Intensity'          },
+    realistic:{ hp1:'Regularization (C)' } },
+  { greek:    { hp1:'Sensitivity'        },
+    animals:  { hp1:'Pack Size'          },
+    zodiac:   { hp1:'Stubbornness'       },
+    realistic:{ hp1:'Trees'              } },
+  { greek:    { hp1:'Curvature'          },
+    animals:  { hp1:'Hibernation'        },
+    zodiac:   { hp1:'Adaptability'       },
+    realistic:{ hp1:'Learning Rate'      } },
+  { greek:    { hp1:'Step Size'          },
+    animals:  { hp1:'Wingspan'           },
+    zodiac:   { hp1:'Intuition'          },
+    realistic:{ hp1:'Learning Rate'      } },
 ];
 
 // ── Accuracy curves (one per model position) ──────────────────────────────────
@@ -454,22 +446,16 @@ const HP_CONFIG = [
 // hp1TrainBoost: how much HP1=100 adds to train accuracy
 // hp1sweet: HP1 value (0-100) where overfitting starts kicking in
 // hp1OverfitMax: max validation penalty at HP1=100 (quadratic)
-// hp2sweet: optimal HP2 value (0-100); omit for 1-param models
-// hp2PenaltyMax: max validation penalty when HP2 is fully wrong
 // jitter: run-to-run noise amplitude
 const CURVES = [
-  // Pos 0 (SVM/Alpha): HP2 sweet at 25 (far from default 50) — +12% improvable
-  { base:0.66, hp1TrainBoost:0.36, hp1sweet:48, hp1OverfitMax:0.42, hp2sweet:25, hp2PenaltyMax:0.24, jitter:0.028 },
-  // Pos 1 (RandForest/Beta): needs high HP1 & HP2 to peak — +13% improvable
-  { base:0.62, hp1TrainBoost:0.32, hp1sweet:62, hp1OverfitMax:0.22, hp2sweet:72, hp2PenaltyMax:0.18, jitter:0.035 },
+  // Pos 0 (SVM/Alpha): sweet at 48, overfits moderately — +12% improvable
+  { base:0.66, hp1TrainBoost:0.36, hp1sweet:48, hp1OverfitMax:0.42, jitter:0.028 },
+  // Pos 1 (RandForest/Beta): needs high HP1 to peak — +13% improvable
+  { base:0.62, hp1TrainBoost:0.32, hp1sweet:62, hp1OverfitMax:0.22, jitter:0.035 },
   // Pos 2 (GradBoost/Gamma): sweet at low HP1=22, overfits fast — +11% improvable
-  { base:0.65, hp1TrainBoost:0.55, hp1sweet:22, hp1OverfitMax:0.55, hp2sweet:62, hp2PenaltyMax:0.26, jitter:0.040 },
-  // Pos 3 (NeuralNet/Delta): HP2 sweet at 75 (far from default 50) — +11% improvable
-  { base:0.64, hp1TrainBoost:0.42, hp1sweet:42, hp1OverfitMax:0.38, hp2sweet:75, hp2PenaltyMax:0.22, jitter:0.045 },
-  // Pos 4 (KNN/Epsilon): 1 param, needs low HP1 around 34 — +8% improvable
-  { base:0.69, hp1TrainBoost:0.45, hp1sweet:15, hp1OverfitMax:0.65, jitter:0.030 },
-  // Pos 5 (NaiveBayes/Zeta): 1 param, naturally high baseline (~92% out of box)
-  { base:0.72, hp1TrainBoost:0.24, hp1sweet:52, hp1OverfitMax:0.30, jitter:0.020 },
+  { base:0.65, hp1TrainBoost:0.55, hp1sweet:22, hp1OverfitMax:0.55, jitter:0.040 },
+  // Pos 3 (NeuralNet/Delta): sweet at 42 — +11% improvable
+  { base:0.64, hp1TrainBoost:0.42, hp1sweet:42, hp1OverfitMax:0.38, jitter:0.045 },
 ];
 
 // ── Tooltips ──────────────────────────────────────────────────────────────────
@@ -521,11 +507,11 @@ let deployModelIdx = -1;
 let deployDone     = false;
 
 // Per-model state
-const mSt = Array.from({length: 6}, () => ({
-  hp1: 50, hp2: 50,
+const mSt = Array.from({length: 4}, () => ({
+  hp1: 50,
   trained: false, lockedIn: false,
   trainAcc: null, valAcc: null, testAcc: null,
-  lockedHp1: null, lockedHp2: null,
+  lockedHp1: null,
   runs: [],
 }));
 
@@ -534,7 +520,6 @@ function getModelSet() { return State.get('modelSet') || 'greek'; }
 function getLabels()   { return MODEL_NAMES[getModelSet()]; }
 function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 function fmtPct(v) { return Math.round(v * 100) + '%'; }
-function hasHp2(idx) { return HP_CONFIG[idx][getModelSet()].hp2 !== null; }
 
 function showHoverTip(text, x, y) {
   const tip = document.getElementById('tooltip');
@@ -546,7 +531,7 @@ function showHoverTip(text, x, y) {
 function hideHoverTip() { document.getElementById('tooltip').style.display = 'none'; }
 
 // ── Accuracy computation ──────────────────────────────────────────────────────
-function computeAccuracy(modelIdx, hp1, hp2) {
+function computeAccuracy(modelIdx, hp1) {
   const c        = CURVES[modelIdx];
   const trainRatio = trainPt / TOTAL;
   const hp1n     = hp1 / 100;
@@ -561,16 +546,9 @@ function computeAccuracy(modelIdx, hp1, hp2) {
   const excess  = Math.max(0, (hp1n - sp) / (1 - sp + 0.001));
   const overP   = excess * excess * c.hp1OverfitMax;
 
-  // HP2 distance penalty (2-param models only)
-  let hp2P = 0;
-  if (hp2 !== null && c.hp2sweet !== undefined) {
-    const dist = Math.abs(hp2 / 100 - c.hp2sweet / 100) / 0.5;
-    hp2P = Math.min(1, dist) * c.hp2PenaltyMax;
-  }
-
   const baseGap = 0.04 + (1 - trainRatio) * 0.02;
   const valAcc  = clamp(
-    trainAcc - baseGap - overP - hp2P + c.jitter * (Math.random() - 0.5),
+    trainAcc - baseGap - overP + c.jitter * (Math.random() - 0.5),
     0.33, trainAcc
   );
   return { trainAcc, valAcc };
@@ -672,10 +650,6 @@ function renderHpPanel() {
   const hp1val = locked ? ms.lockedHp1 : ms.hp1;
   container.appendChild(makeHpRow('hp1', cfg.hp1, hp1val, locked));
 
-  if (cfg.hp2 !== null) {
-    const hp2val = locked ? ms.lockedHp2 : ms.hp2;
-    container.appendChild(makeHpRow('hp2', cfg.hp2, hp2val, locked));
-  }
 }
 
 function makeHpRow(key, name, value, locked) {
@@ -711,8 +685,7 @@ function doTrain() {
   document.getElementById('train-btn').disabled = true;
 
   const ms       = mSt[selModel];
-  const hp2arg   = hasHp2(selModel) ? ms.hp2 : null;
-  const duration = Math.max(400, (trainPt / TOTAL) * 2250);
+  const duration = Math.max(400, (trainPt / TOTAL) * 2500);
 
   const sweep = document.createElement('div');
   sweep.className = 'train-sweep';
@@ -722,11 +695,11 @@ function doTrain() {
 
   showProg('Training…');
   runProg(duration, trainPt, 'Training on example', () => {
-    const { trainAcc, valAcc } = computeAccuracy(selModel, ms.hp1, hp2arg);
+    const { trainAcc, valAcc } = computeAccuracy(selModel, ms.hp1);
     ms.trainAcc = trainAcc;
     ms.valAcc   = valAcc;
     ms.trained  = true;
-    ms.runs.push({ hp1: ms.hp1, hp2: hp2arg, trainAcc, valAcc });
+    ms.runs.push({ hp1: ms.hp1, trainAcc, valAcc });
 
     hideProg();
     renderModelBtns();
@@ -747,7 +720,7 @@ function doTrain() {
 
     Log.event('l3_train', {
       model: selModel, modelName: getLabels()[selModel],
-      hp1: ms.hp1, hp2: hp2arg,
+      hp1: ms.hp1,
       trainAcc, valAcc,
       splitTrain: trainPt, splitVal: TEST_START - trainPt, splitTest: TEST_SIZE,
     });
@@ -786,7 +759,7 @@ function renderLeaderboard() {
   container.innerHTML = '';
 
   // Sort: locked (by testAcc desc) → trained-not-locked (by valAcc desc) → untrained
-  const order = Array.from({length: 6}, (_, i) => i).sort((a, b) => {
+  const order = Array.from({length: 4}, (_, i) => i).sort((a, b) => {
     const aL = mSt[a].lockedIn, bL = mSt[b].lockedIn;
     const aT = mSt[a].trained,  bT = mSt[b].trained;
     if (aL && bL)  return mSt[b].testAcc - mSt[a].testAcc;
@@ -827,8 +800,7 @@ function renderLeaderboard() {
     hpEl.className = 'lb-hps';
     if (ms.trained) {
       const h1 = ms.lockedIn ? ms.lockedHp1 : ms.hp1;
-      const h2 = ms.lockedIn ? ms.lockedHp2 : (hasHp2(i) ? ms.hp2 : null);
-      hpEl.textContent = cfg.hp1 + ': ' + h1 + (h2 !== null ? ' · ' + cfg.hp2 + ': ' + h2 : '');
+      hpEl.textContent = cfg.hp1 + ': ' + h1;
     } else {
       hpEl.textContent = '—';
     }
@@ -900,8 +872,6 @@ function renderModelHistory() {
   const set   = getModelSet();
   const cfg   = HP_CONFIG[selModel][set];
   const label = getLabels()[selModel];
-  const has2  = hasHp2(selModel);
-
   document.getElementById('mhist-label').textContent = label + ' — Runs';
 
   container.innerHTML = '';
@@ -914,7 +884,7 @@ function renderModelHistory() {
   // Column header row
   const header = document.createElement('div');
   header.className = 'mhist-row mhist-header';
-  header.innerHTML = `<div></div><div>${cfg.hp1}</div><div>${has2 ? cfg.hp2 : ''}</div><div style="text-align:right;color:var(--train);">Train</div><div style="text-align:right;color:var(--val);">Val</div>`;
+  header.innerHTML = `<div></div><div>${cfg.hp1}</div><div style="text-align:right;color:var(--train);">Train</div><div style="text-align:right;color:var(--val);">Val</div>`;
   container.appendChild(header);
 
   [...ms.runs]
@@ -926,7 +896,6 @@ function renderModelHistory() {
       row.innerHTML = `
         <div class="mhist-rank">#${rank + 1}</div>
         <div class="mhist-hpval">${run.hp1}</div>
-        <div class="mhist-hpval">${run.hp2 !== null ? run.hp2 : ''}</div>
         <div class="mhist-acc mhist-train">${fmtPct(run.trainAcc)}</div>
         <div class="mhist-acc mhist-val">${fmtPct(run.valAcc)}</div>`;
 
@@ -934,7 +903,6 @@ function renderModelHistory() {
         row.style.cursor = 'pointer';
         row.addEventListener('click', () => {
           ms.hp1 = run.hp1;
-          if (run.hp2 !== null) ms.hp2 = run.hp2;
           ms.trainAcc = run.trainAcc;
           ms.valAcc   = run.valAcc;
           renderHpPanel();
@@ -962,12 +930,11 @@ function confirmReveal() {
   ms.testAcc   = computeTestAcc(ms.valAcc);
   ms.lockedIn  = true;
   ms.lockedHp1 = ms.hp1;
-  ms.lockedHp2 = hasHp2(idx) ? ms.hp2 : null;
   pendingRevealIdx = -1;
 
   Log.event('l3_reveal_test', {
     model: idx, modelName: getLabels()[idx],
-    hp1: ms.lockedHp1, hp2: ms.lockedHp2,
+    hp1: ms.lockedHp1,
     valAcc: ms.valAcc, testAcc: ms.testAcc,
   });
 
@@ -1241,8 +1208,8 @@ function doReset() {
   splitLocked = false; selModel = 0; busy = false; pendingRevealIdx = -1;
   trainPt = 72; deployModelIdx = -1; deployDone = false;
   mSt.forEach(m => Object.assign(m, {
-    hp1:50, hp2:50, trained:false, lockedIn:false,
-    trainAcc:null, valAcc:null, testAcc:null, lockedHp1:null, lockedHp2:null,
+    hp1:50, trained:false, lockedIn:false,
+    trainAcc:null, valAcc:null, testAcc:null, lockedHp1:null,
     runs:[],
   }));
 

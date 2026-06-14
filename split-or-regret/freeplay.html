@@ -234,6 +234,37 @@
   @media (max-width: 480px) {
     .split-zones { flex-wrap: wrap; gap: 6px; }
   }
+
+  /* ── Dataset 3 (class imbalance) ── */
+  #ds3-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 20px; margin-bottom: 16px;
+  }
+  .ds3-dist-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 8px 0 0; gap: 2px; }
+  .ds3-class-a  { background: var(--accent); }
+  .ds3-class-b  { background: var(--val); }
+  .class-breakdown { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .class-acc-row { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+  .class-acc-label { font-size: 0.8rem; flex-shrink: 0; width: 72px; font-weight: 600; }
+  .class-acc-bar-bg { flex: 1; background: var(--border); border-radius: 4px; overflow: hidden; height: 8px; }
+  .class-acc-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; width: 0%; }
+  .class-acc-pct { font-size: 0.8rem; font-weight: 700; width: 32px; text-align: right; }
+  .ds3-warning {
+    margin-top: 10px; padding: 8px 12px; font-size: 0.82rem; font-weight: 600;
+    background: color-mix(in srgb, var(--test) 12%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--test) 35%, var(--border));
+    border-radius: calc(var(--radius) / 1.5); color: var(--test); display: none;
+  }
+
+  /* ── Shared result card ── */
+  #shared-result-card {
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+    border-radius: var(--radius); padding: 16px 20px; margin-bottom: 16px;
+    display: flex; align-items: flex-start; gap: 14px;
+  }
+  .sr-score { font-size: 2rem; font-weight: 800; color: var(--accent); line-height: 1; }
+  .sr-label { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -313,6 +344,22 @@
   </header>
 
   <main>
+    <!-- Shared result card (shown when page is loaded from a share link) -->
+    <div id="shared-result-card" style="display:none;">
+      <div>
+        <div class="sr-score" id="sr-score-num">—</div>
+        <div class="sr-label">pts</div>
+      </div>
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:0.95rem;" id="sr-headline"></div>
+        <div style="font-size:0.82rem;color:var(--muted);margin-top:4px;" id="sr-subline"></div>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+          <button class="btn" style="font-size:0.82rem;padding:6px 14px;" onclick="claimSharedResult()">Add to my scores</button>
+          <button style="padding:6px 14px;border:1px solid var(--border);border-radius:var(--radius);background:none;color:var(--muted);font-family:var(--font);font-size:0.82rem;cursor:pointer;" onclick="dismissSharedResult()">Dismiss</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Dataset selector -->
     <div class="dataset-selector">
       <div class="section-label">Dataset</div>
@@ -349,6 +396,31 @@
       <div id="data-grid" style="position:relative;"></div>
       <div class="split-hint" id="split-hint">
         Drag to adjust the train / validation split — test is always held out
+      </div>
+    </div>
+
+    <!-- Dataset 3: class imbalance resampling controls -->
+    <div id="ds3-panel" style="display:none;">
+      <div class="section-label" style="margin-bottom:4px;">Class Imbalance</div>
+      <div style="font-size:0.82rem;color:var(--muted);">This dataset has uneven class distribution. Training on imbalanced data can bias your model toward the majority class.</div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:0.78rem;font-weight:600;margin-top:10px;">
+        <span style="color:var(--accent);white-space:nowrap;">85% Class A</span>
+        <div class="ds3-dist-bar" style="flex:1;margin:0;">
+          <div class="ds3-class-a" style="flex:85;"></div>
+          <div class="ds3-class-b" style="flex:15;"></div>
+        </div>
+        <span style="color:var(--val);white-space:nowrap;">15% Class B</span>
+      </div>
+      <div style="font-size:0.76rem;color:var(--muted);margin:6px 0 14px;">Real-world distribution: 60% Class A · 40% Class B</div>
+      <div class="hp-slider-row">
+        <span class="hp-name">Undersample A</span>
+        <input type="range" class="hp-slider" id="ds3-undersample" min="0" max="100" value="0">
+        <span class="hp-val" id="ds3-undersample-val">0</span>
+      </div>
+      <div class="hp-slider-row" style="margin-top:8px;">
+        <span class="hp-name">Oversample B</span>
+        <input type="range" class="hp-slider" id="ds3-oversample" min="0" max="100" value="0">
+        <span class="hp-val" id="ds3-oversample-val">0</span>
       </div>
     </div>
 
@@ -402,6 +474,21 @@
             <div class="accuracy-label" style="color:var(--val);">Val accuracy</div>
             <div class="accuracy-bar-bg"><div class="accuracy-bar val-bar-fill" id="val-bar" style="width:0%"></div></div>
             <div class="accuracy-pct" id="val-pct" style="color:var(--val);">—</div>
+          </div>
+          <!-- Per-class breakdown (Dataset 3 only) -->
+          <div id="class-breakdown" class="class-breakdown" style="display:none;">
+            <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:4px;">Per-class accuracy</div>
+            <div class="class-acc-row">
+              <span class="class-acc-label" style="color:var(--accent);">Class A</span>
+              <div class="class-acc-bar-bg"><div class="class-acc-fill" id="class-a-bar" style="background:var(--accent);"></div></div>
+              <span class="class-acc-pct" id="class-a-pct">—</span>
+            </div>
+            <div class="class-acc-row">
+              <span class="class-acc-label" style="color:var(--val);">Class B</span>
+              <div class="class-acc-bar-bg"><div class="class-acc-fill" id="class-b-bar" style="background:var(--val);"></div></div>
+              <span class="class-acc-pct" id="class-b-pct">—</span>
+            </div>
+            <div id="ds3-warning" class="ds3-warning">⚠ Possible majority-class bias — Class B accuracy is very low. Try resampling.</div>
           </div>
         </div>
       </div>
@@ -578,6 +665,8 @@ let credits       = 20;
 let modelOrder    = [0,1,2,3,4,5];
 let pendingRevealIdx = -1;
 let deployedIdx      = -1;
+let undersampleAmt   = 0;   // Dataset 3 resampling controls
+let oversampleAmt    = 0;
 
 const MIN_TRAIN = 6;
 const MIN_VAL   = 4;
@@ -588,6 +677,7 @@ const mSt = Array.from({length: 6}, () => ({
   trained:false, lockedIn:false,
   trainAcc:null, valAcc:null, testAcc:null,
   lockedHp1:null, lockedHp2:null,
+  classAcc:null,
   runs:[],
 }));
 
@@ -651,8 +741,9 @@ function computeRealWorldAcc(testAcc) {
   let base = testAcc;
   if (cfg.id === 3) {
     // Class imbalance: real world is 60/40 but training was 85/15
-    // Model likely over-optimised for Class A, so real-world is worse
-    const imbalancePenalty = 0.05 + Math.random() * 0.10;
+    // Resampling reduces the penalty
+    const rf = getResampleFactor();
+    const imbalancePenalty = (0.05 + Math.random() * 0.10) * (1 - rf * 0.85);
     base = clamp(testAcc - imbalancePenalty, 0.33, 0.97);
   }
   const noise = (Math.random() - 0.5) * 0.10;
@@ -661,6 +752,26 @@ function computeRealWorldAcc(testAcc) {
     Math.max(0.33, base - 0.05),
     Math.min(0.97, base + 0.05)
   );
+}
+
+// ── Dataset 3 helpers ─────────────────────────────────────────────────────────
+function getResampleFactor() {
+  return Math.min(1, (undersampleAmt + oversampleAmt) / 150);
+}
+
+function computePerClassAccuracy(valAcc) {
+  // Without resampling: model heavily biases toward Class A (majority, 85%)
+  // Class B accuracy can be very low — the whole point of the imbalance lesson
+  const rf   = getResampleFactor();
+  const bias = 0.16 * (1 - rf);
+  const accA = clamp(valAcc + bias + 0.02 * (Math.random() - 0.5), 0.33, 0.97);
+  // valAcc = 0.85 * accA + 0.15 * accB  →  accB = (valAcc - 0.85 * accA) / 0.15
+  const accB = clamp((valAcc - 0.85 * accA) / 0.15, 0.10, 0.97);
+  return { accA, accB };
+}
+
+function renderDs3Panel() {
+  document.getElementById('ds3-panel').style.display = curDatasetId === 3 ? 'block' : 'none';
 }
 
 // ── SVG block ─────────────────────────────────────────────────────────────────
@@ -778,10 +889,17 @@ function initSession() {
   pendingRevealIdx = -1;
   deployedIdx      = -1;
 
+  undersampleAmt = 0;
+  oversampleAmt  = 0;
+  const _unEl = document.getElementById('ds3-undersample');
+  const _ovEl = document.getElementById('ds3-oversample');
+  if (_unEl) { _unEl.value = 0; document.getElementById('ds3-undersample-val').textContent = '0'; }
+  if (_ovEl) { _ovEl.value = 0; document.getElementById('ds3-oversample-val').textContent = '0'; }
+
   mSt.forEach(m => Object.assign(m, {
     hp1:50, hp2:50, trained:false, lockedIn:false,
     trainAcc:null, valAcc:null, testAcc:null,
-    lockedHp1:null, lockedHp2:null, runs:[],
+    lockedHp1:null, lockedHp2:null, classAcc:null, runs:[],
   }));
 
   const sliderTrain = document.getElementById('slider-train');
@@ -803,6 +921,7 @@ function initSession() {
   document.getElementById('credits-warning').style.display   = 'none';
 
   renderDatasetSelector();
+  renderDs3Panel();
   renderGrid();
   updateSplitUI();
   renderModelBtns();
@@ -923,6 +1042,7 @@ function doTrain() {
     ms.trainAcc = trainAcc;
     ms.valAcc   = valAcc;
     ms.trained  = true;
+    ms.classAcc = (ds().id === 3) ? computePerClassAccuracy(valAcc) : null;
     const jAmt = 2 * (ds().jitterMult || 1);
     ms.runs.push({ hp1: ms.hp1, hp2: hp2arg, trainAcc, valAcc,
       jx: (Math.random() - 0.5) * 2 * jAmt,
@@ -968,6 +1088,9 @@ function clearAccuracyPanel(idx) {
   document.getElementById('val-bar').style.width    = '0%';
   document.getElementById('train-pct').textContent  = '—';
   document.getElementById('val-pct').textContent    = '—';
+  document.getElementById('class-breakdown').style.display = 'none';
+  const w = document.getElementById('ds3-warning');
+  if (w) w.style.display = 'none';
 }
 
 function showAccuracyFor(idx) {
@@ -978,6 +1101,19 @@ function showAccuracyFor(idx) {
   requestAnimationFrame(() => {
     setBar('train-bar', 'train-pct', ms.trainAcc);
     setBar('val-bar',   'val-pct',   ms.valAcc);
+    const breakdownEl = document.getElementById('class-breakdown');
+    const warningEl   = document.getElementById('ds3-warning');
+    if (ms.classAcc && ds().id === 3) {
+      breakdownEl.style.display = 'block';
+      document.getElementById('class-a-bar').style.width = fmtPct(ms.classAcc.accA);
+      document.getElementById('class-a-pct').textContent = fmtPct(ms.classAcc.accA);
+      document.getElementById('class-b-bar').style.width = fmtPct(ms.classAcc.accB);
+      document.getElementById('class-b-pct').textContent = fmtPct(ms.classAcc.accB);
+      if (warningEl) warningEl.style.display = ms.classAcc.accB < 0.35 ? 'block' : 'none';
+    } else {
+      breakdownEl.style.display = 'none';
+      if (warningEl) warningEl.style.display = 'none';
+    }
   });
 }
 
@@ -1612,10 +1748,29 @@ function showDeployFinal(base, cred, bonus, total, won, compPct) {
     document.getElementById('dp-s-total').textContent = Math.round(e * total);
     if (e < 1) { requestAnimationFrame(frame); return; }
     document.getElementById('dp-outcome').style.display = 'block';
+    // Save high score
     const prev = fpGet('highScores', {});
     if (!prev[ds().id] || total > prev[ds().id]) {
-      prev[ds().id] = total; fpSet('highScores', prev); renderDatasetSelector();
+      prev[ds().id] = total; fpSet('highScores', prev);
     }
+    // Step 8: unlock other datasets after first deploy on Dataset 1
+    if (ds().id === 1) fpSet('dataset1Completed', true);
+    renderDatasetSelector();
+    // Step 7: shareable URL
+    const shareUrl = new URL(window.location.href);
+    shareUrl.search = '';
+    shareUrl.searchParams.set('r', total);
+    shareUrl.searchParams.set('d', ds().id);
+    shareUrl.searchParams.set('m', encodeURIComponent(getLabels()[deployedIdx]));
+    shareUrl.searchParams.set('t', base);
+    history.pushState(null, '', shareUrl.toString());
+    const shareHref = shareUrl.toString();
+    const actionsEl = document.createElement('div');
+    actionsEl.style.cssText = 'display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;';
+    actionsEl.innerHTML = `
+      <button class="btn" style="font-size:0.85rem;padding:8px 16px;" onclick="copyShareLink(this,'${shareHref.replace(/'/g, "\\'")}')">📋 Copy link</button>
+      <button style="padding:8px 16px;border:1px solid var(--border);border-radius:var(--radius);background:none;color:var(--text);font-family:var(--font);font-size:0.85rem;cursor:pointer;font-weight:600;" onclick="doReset()">↺ Try again</button>`;
+    finalEl.appendChild(actionsEl);
   })(performance.now());
 }
 
@@ -1705,6 +1860,72 @@ function doReset() {
   Log.event('fp_reset', { dataset: curDatasetId });
 }
 
+// ── Step 7: Shareable URL ─────────────────────────────────────────────────────
+function copyShareLink(btn, url) {
+  navigator.clipboard.writeText(url).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => { btn.textContent = orig; }, 2000);
+  }).catch(() => { prompt('Copy this link:', url); });
+}
+
+let _sharedDatasetId = null, _sharedScore = null;
+
+function checkSharedResult() {
+  const sp = new URLSearchParams(window.location.search);
+  if (!sp.has('r') || !sp.has('d')) return;
+  const score   = +sp.get('r');
+  const dataset = +sp.get('d');
+  const model   = decodeURIComponent(sp.get('m') || '?');
+  const testAcc = +sp.get('t');
+  if (!score || !dataset) return;
+  _sharedDatasetId = dataset;
+  _sharedScore     = score;
+  const card = document.getElementById('shared-result-card');
+  document.getElementById('sr-score-num').textContent = score;
+  document.getElementById('sr-headline').textContent  = `Score shared: ${score} pts on Dataset ${dataset}`;
+  document.getElementById('sr-subline').textContent   = `Model: ${model} · Test accuracy: ${testAcc}%`;
+  card.style.display = 'flex';
+}
+
+function claimSharedResult() {
+  if (_sharedScore !== null && _sharedDatasetId !== null) {
+    const prev = fpGet('highScores', {});
+    if (!prev[_sharedDatasetId] || _sharedScore > prev[_sharedDatasetId]) {
+      prev[_sharedDatasetId] = _sharedScore;
+      fpSet('highScores', prev);
+    }
+    renderDatasetSelector();
+    if (_sharedDatasetId !== curDatasetId) switchDataset(_sharedDatasetId);
+  }
+  dismissSharedResult();
+}
+
+function dismissSharedResult() {
+  document.getElementById('shared-result-card').style.display = 'none';
+  const url = new URL(window.location.href);
+  url.search = '';
+  history.replaceState(null, '', url.pathname);
+}
+
+// ── Dataset 3 slider listeners ────────────────────────────────────────────────
+document.getElementById('ds3-undersample').addEventListener('input', function() {
+  undersampleAmt = +this.value;
+  document.getElementById('ds3-undersample-val').textContent = this.value;
+  if (ds().id === 3 && mSt[selModel].trained) {
+    mSt[selModel].classAcc = computePerClassAccuracy(mSt[selModel].valAcc);
+    showAccuracyFor(selModel);
+  }
+});
+document.getElementById('ds3-oversample').addEventListener('input', function() {
+  oversampleAmt = +this.value;
+  document.getElementById('ds3-oversample-val').textContent = this.value;
+  if (ds().id === 3 && mSt[selModel].trained) {
+    mSt[selModel].classAcc = computePerClassAccuracy(mSt[selModel].valAcc);
+    showAccuracyFor(selModel);
+  }
+});
+
 // ── Global event listeners ────────────────────────────────────────────────────
 document.getElementById('slider-train').addEventListener('input', function() {
   if (splitLocked) return;
@@ -1738,11 +1959,8 @@ document.addEventListener('click', e => {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 Themes.fromState();
-if (State.get('modelSet')) {
-  // already have model set from main game — no overlay needed
-}
-
 initSession();
+checkSharedResult();
 </script>
 </body>
 </html>

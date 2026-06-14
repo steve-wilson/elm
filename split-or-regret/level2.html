@@ -306,10 +306,10 @@ const TOTAL = 120;
 const SVG_A = `<svg viewBox="0 0 10 10"><rect class="block-fill" width="10" height="10"/></svg>`;
 
 const MODEL_SETS = {
-  greek:     ['α','β','γ','δ','ε','ζ'],
-  animals:   ['🦊','🐺','🐻','🦅','🦈','🐯'],
-  zodiac:    ['♈','♉','♊','♋','♌','♍'],
-  realistic: ['SVM','RandForest','GradBoost','NeuralNet','KNN','NaiveBayes'],
+  greek:     ['α','β','γ','δ'],
+  animals:   ['🦊','🐺','🐻','🦅'],
+  zodiac:    ['♈','♉','♊','♋'],
+  realistic: ['SVM','RandForest','GradBoost','NeuralNet'],
 };
 
 const CURVES = [
@@ -317,8 +317,6 @@ const CURVES = [
   {base:0.44, scale:0.54, jitter:0.03, overfit:0.16},  // best train → worst-ish test (overfits)
   {base:0.64, scale:0.24, jitter:0.02, overfit:0.04},  // mid train → best test (generalises well)
   {base:0.50, scale:0.36, jitter:0.03, overfit:0.10},  // moderate throughout
-  {base:0.38, scale:0.60, jitter:0.03, overfit:0.19},  // 2nd-best train → worst test (overfits badly)
-  {base:0.58, scale:0.34, jitter:0.02, overfit:0.06},  // good train → 2nd-best test
 ];
 
 let splitPt     = 96;
@@ -464,7 +462,7 @@ function doTrain() {
   const ms       = mSt[selModel];
   const ratio    = splitPt / TOTAL;
   const curve    = CURVES[selModel];
-  const duration = Math.max(800, ratio * 5000);
+  const duration = Math.max(400, ratio * 2500);
 
   const sweep = document.createElement('div');
   sweep.className = 'train-sweep';

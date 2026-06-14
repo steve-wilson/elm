@@ -24,7 +24,7 @@
   }
 
   /* ── Progress dots ── */
-  .progress { display: flex; gap: 8px; justify-content: center; margin-bottom: 32px; }
+  .progress { display: flex; gap: 8px; justify-content: center; margin-bottom: 28px; }
   .pdot {
     width: 8px; height: 8px; border-radius: 50%;
     background: #e5e7eb; transition: background 0.3s;
@@ -32,10 +32,74 @@
   .pdot.active { background: #3b82f6; }
   .pdot.done   { background: #10b981; }
 
+  /* ── Question visual ── */
+  .q-vis {
+    background: #f8fafc; border: 1px solid #e2e8f0;
+    border-radius: 10px; padding: 14px 16px; margin-bottom: 18px;
+  }
+  .vis-title {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #94a3b8; margin-bottom: 10px;
+  }
+
+  /* ── Split comparison rows ── */
+  .split-cmp { display: flex; flex-direction: column; gap: 10px; }
+  .split-row { display: flex; align-items: center; gap: 8px; }
+  .split-lbl { font-size: 0.7rem; color: #6b7280; width: 90px; flex-shrink: 0; line-height: 1.3; }
+  .split-bar { display: flex; height: 18px; border-radius: 5px; overflow: hidden; flex: 1; gap: 2px; }
+  .split-train { background: #10b981; }
+  .split-test  { background: #f97316; }
+  .split-val   { background: #6366f1; }
+  .split-note  { font-size: 0.7rem; color: #9ca3af; white-space: nowrap; }
+
+  /* ── Three-option comparison ── */
+  .three-opts { display: flex; flex-direction: column; gap: 8px; }
+  .three-row  { display: flex; align-items: center; gap: 8px; }
+  .three-lbl  { font-size: 0.72rem; font-weight: 700; color: #374151; width: 44px; flex-shrink: 0; }
+  .three-note { font-size: 0.7rem; color: #9ca3af; white-space: nowrap; }
+  .three-row.highlight .three-lbl { color: #10b981; }
+  .three-row.highlight .three-note { color: #10b981; font-weight: 600; }
+
+  /* ── Peek sequence ── */
+  .peek-seq { display: flex; flex-direction: column; gap: 6px; }
+  .peek-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 7px 10px; border-radius: 6px; background: white;
+    border: 1px solid #e5e7eb; font-size: 0.78rem; line-height: 1.4;
+  }
+  .peek-badge {
+    font-size: 0.65rem; font-weight: 700; background: #fef3c7; color: #92400e;
+    padding: 2px 6px; border-radius: 4px; white-space: nowrap; flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .peek-text { color: #374151; }
+  .peek-consequence {
+    margin-top: 8px; padding: 8px 12px; border-radius: 6px;
+    background: #fef2f2; border: 1px solid #fecaca;
+    font-size: 0.75rem; color: #991b1b; line-height: 1.5;
+  }
+
+  /* ── Conclusion split diagram ── */
+  .conclusion-vis { margin: 20px 0 24px; }
+  .split-bar-lg {
+    display: flex; height: 28px; border-radius: 8px; overflow: hidden;
+    gap: 3px; margin-bottom: 8px;
+  }
+  .split-bar-lg div {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.73rem; font-weight: 700; color: white;
+  }
+  .split-legend {
+    display: flex; flex-wrap: wrap; gap: 10px 16px; font-size: 0.75rem; font-weight: 600;
+  }
+  .legend-dot {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px;
+  }
+
   /* ── Question ── */
   .q-text {
-    font-size: 1.15rem; font-weight: 800; color: #1a1a2e;
-    line-height: 1.45; margin-bottom: 22px;
+    font-size: 1.1rem; font-weight: 800; color: #1a1a2e;
+    line-height: 1.45; margin-bottom: 18px;
   }
 
   .options { display: flex; flex-direction: column; gap: 10px; }
@@ -86,6 +150,7 @@
   <div class="progress" id="progress"></div>
 
   <div id="questions-container">
+    <div id="q-vis"></div>
     <div class="q-text" id="q-text"></div>
     <div class="options" id="options"></div>
     <div class="feedback" id="feedback"></div>
@@ -96,13 +161,128 @@
     <h2>The split is a choice, not a formula</h2>
     <p>More training data tends to produce a better model. More test data gives you a more reliable estimate of how that model will actually perform. Neither is free — every example you give to one side you take from the other.</p>
     <p>In practice, 80% train / 20% test is a common starting point. But practitioners adjust it: with very small datasets they might keep more for testing; with enormous ones the exact ratio matters less.</p>
+
     <div class="key-term">The harder problem: every time you use the test set to make a decision, it becomes a little less trustworthy as a benchmark.</div>
-    <p>In Level 3, you'll work with a setup that lets you make decisions freely — without touching the test set at all.</p>
+
+    <p>In Level 3, you'll work with a <strong>validation set</strong> — a middle slice you can use freely for decisions — while the test set stays sealed until you're ready to commit.</p>
+
+    <div class="conclusion-vis">
+      <div class="split-bar-lg">
+        <div class="split-train" style="flex:6">Training</div>
+        <div class="split-val"   style="flex:2">Validation</div>
+        <div class="split-test"  style="flex:2">Test</div>
+      </div>
+      <div class="split-legend">
+        <span><span class="legend-dot" style="background:#10b981"></span><span style="color:#10b981">Train — model learns here</span></span>
+        <span><span class="legend-dot" style="background:#6366f1"></span><span style="color:#6366f1">Validation — tune freely</span></span>
+        <span><span class="legend-dot" style="background:#f97316"></span><span style="color:#f97316">Test — sealed until you commit</span></span>
+      </div>
+    </div>
+
     <button class="next-btn" style="display:block;" onclick="goLevel3()">Start Level 3 →</button>
   </div>
 </div>
 
 <script>
+const VISUALS = [
+  // Q1: more training data → better model
+  `<div class="q-vis">
+    <div class="vis-title">Effect of training data on the model</div>
+    <div class="split-cmp">
+      <div class="split-row">
+        <div class="split-lbl">More training data</div>
+        <div class="split-bar">
+          <div class="split-train" style="flex:8"></div>
+          <div class="split-test"  style="flex:2"></div>
+        </div>
+        <div class="split-note" style="color:#10b981">↑ better model</div>
+      </div>
+      <div class="split-row">
+        <div class="split-lbl" style="color:#9ca3af">Less training data</div>
+        <div class="split-bar">
+          <div class="split-train" style="flex:5"></div>
+          <div class="split-test"  style="flex:5"></div>
+        </div>
+        <div class="split-note">↓ weaker model</div>
+      </div>
+    </div>
+  </div>`,
+
+  // Q2: more test data → reliable estimate
+  `<div class="q-vis">
+    <div class="vis-title">Effect of test set size on the estimate</div>
+    <div class="split-cmp">
+      <div class="split-row">
+        <div class="split-lbl">Small test set</div>
+        <div class="split-bar">
+          <div class="split-train" style="flex:9"></div>
+          <div class="split-test"  style="flex:1"></div>
+        </div>
+        <div class="split-note">noisy estimate ±10%</div>
+      </div>
+      <div class="split-row">
+        <div class="split-lbl" style="color:#f97316">Larger test set</div>
+        <div class="split-bar">
+          <div class="split-train" style="flex:7"></div>
+          <div class="split-test"  style="flex:3"></div>
+        </div>
+        <div class="split-note" style="color:#f97316">reliable estimate ±3%</div>
+      </div>
+    </div>
+  </div>`,
+
+  // Q3: common splits — 80/20 is the standard
+  `<div class="q-vis">
+    <div class="vis-title">Common train / test splits</div>
+    <div class="three-opts">
+      <div class="three-row">
+        <div class="three-lbl">50 / 50</div>
+        <div class="split-bar" style="flex:1">
+          <div class="split-train" style="flex:1"></div>
+          <div class="split-test"  style="flex:1"></div>
+        </div>
+        <div class="three-note">trains on half</div>
+      </div>
+      <div class="three-row highlight">
+        <div class="three-lbl">80 / 20</div>
+        <div class="split-bar" style="flex:1">
+          <div class="split-train" style="flex:4"></div>
+          <div class="split-test"  style="flex:1"></div>
+        </div>
+        <div class="three-note">most common ✓</div>
+      </div>
+      <div class="three-row">
+        <div class="three-lbl">99 / 1</div>
+        <div class="split-bar" style="flex:1">
+          <div class="split-train" style="flex:99"></div>
+          <div class="split-test"  style="flex:1"></div>
+        </div>
+        <div class="three-note">almost no test</div>
+      </div>
+    </div>
+  </div>`,
+
+  // Q4: the peeking problem
+  `<div class="q-vis">
+    <div class="vis-title">What you did in Level 2</div>
+    <div class="peek-seq">
+      <div class="peek-row">
+        <div class="peek-badge">Peek 1</div>
+        <div class="peek-text">Checked test score on model α — 71%. Switched to model β.</div>
+      </div>
+      <div class="peek-row">
+        <div class="peek-badge">Peek 2</div>
+        <div class="peek-text">Checked test score on model β — 76%. Decided to try model γ.</div>
+      </div>
+      <div class="peek-row">
+        <div class="peek-badge">Peek 3</div>
+        <div class="peek-text">Checked test score on model γ — 79%. Looked good enough to deploy.</div>
+      </div>
+    </div>
+    <div class="peek-consequence">Each test score guided your next move — so by the end, the test set had quietly shaped every decision you made.</div>
+  </div>`,
+];
+
 const QUESTIONS = [
   {
     q: "You ran Level 2 twice — once with more training data, once with less. What effect did having more training data tend to have on accuracy?",
@@ -205,6 +385,7 @@ function renderProgress() {
 
 function renderQuestion() {
   const q = QUESTIONS[currentQ];
+  document.getElementById('q-vis').innerHTML = VISUALS[currentQ] || '';
   document.getElementById('q-text').textContent = q.q;
 
   const optEl = document.getElementById('options');

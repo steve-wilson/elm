@@ -151,8 +151,8 @@
   color: var(--text); cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
-.feat-pick-btn:hover { border-color: var(--accent); }
-.feat-pick-btn.used  { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg)); cursor: default; }
+.feat-pick-btn:hover  { border-color: var(--accent); }
+.feat-pick-btn.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--bg)); }
 
 /* Feature reveal cards */
 .feature-reveal-card {
@@ -511,9 +511,10 @@ function nextCustomer() {
     `Customer ${rushIdx + 1} of ${RUSH_ALIENS.length}`;
 
   const walker = document.getElementById('alien-walker');
+  walker.querySelectorAll('.reaction-badge').forEach(b => b.remove());
   document.getElementById('walker-svg').innerHTML = renderAlien(alien, 100);
 
-  // Snap offstage right, then walk in
+  // Snap offstage right, then walk in (reset any transition override from the fast exit)
   walker.style.transition = 'none';
   walker.classList.remove('on-stage', 'off-left');
   walker.classList.add('off-right');
@@ -566,7 +567,7 @@ function serveFood(choice) {
   showReaction(correct);
   recordResult(correct ? 'correct' : 'wrong', alien, choice, reactionMs);
 
-  setTimeout(advanceCustomer, 1900);
+  setTimeout(advanceCustomer, 700);
 }
 
 function missCustomer() {
@@ -579,7 +580,7 @@ function missCustomer() {
   showReaction(false);
   recordResult('miss', alien, null, PATIENCE_SECONDS * 1000);
 
-  setTimeout(advanceCustomer, 1900);
+  setTimeout(advanceCustomer, 700);
 }
 
 function highlightButtons(chosen, trueLabel) {
@@ -603,10 +604,11 @@ function showReaction(correct) {
 
 function advanceCustomer() {
   const walker = document.getElementById('alien-walker');
+  walker.style.transition = 'transform 0.28s ease-in, opacity 0.28s';
   walker.classList.remove('on-stage');
   walker.classList.add('off-left');
   rushIdx++;
-  setTimeout(nextCustomer, 500);
+  setTimeout(nextCustomer, 320);
 }
 
 function recordResult(outcome, alien, studentChoice, reactionMs) {
@@ -751,8 +753,10 @@ function makeGroupLabel(cls) {
 
 function revealFeature(feat) {
   const btn = document.querySelector(`[data-feat="${feat}"]`);
-  if (btn.classList.contains('used')) return;
-  btn.classList.add('used');
+  if (btn.classList.contains('active')) return;
+  document.querySelectorAll('.feat-pick-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('feature-reveals').innerHTML = '';
 
   const labels = FEATURE_LABELS[feat];
 

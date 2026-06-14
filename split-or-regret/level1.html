@@ -393,22 +393,22 @@
 <div id="modelset-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:100;">
   <div class="theme-card">
     <h1>Choose Your Models</h1>
-    <p>Pick a naming style for the 6 models you'll train. You can change this anytime.</p>
+    <p>Pick a naming style for the 4 models you'll train. You can change this anytime.</p>
     <div class="theme-options">
       <button class="theme-btn" onclick="pickModelSet('greek')">
-        <div style="font-size:1.3rem;letter-spacing:0.1em;margin-bottom:6px;">α β γ δ ε ζ</div>
+        <div style="font-size:1.3rem;letter-spacing:0.1em;margin-bottom:6px;">α β γ δ</div>
         Greek Letters
       </button>
       <button class="theme-btn" onclick="pickModelSet('animals')">
-        <div style="font-size:1.3rem;margin-bottom:6px;">🦊 🐺 🐻 🦅 🦈 🐯</div>
+        <div style="font-size:1.3rem;margin-bottom:6px;">🦊 🐺 🐻 🦅</div>
         Animals
       </button>
       <button class="theme-btn" onclick="pickModelSet('zodiac')">
-        <div style="font-size:1.3rem;letter-spacing:0.05em;margin-bottom:6px;">♈ ♉ ♊ ♋ ♌ ♍</div>
+        <div style="font-size:1.3rem;letter-spacing:0.05em;margin-bottom:6px;">♈ ♉ ♊ ♋</div>
         Zodiac
       </button>
       <button class="theme-btn" onclick="pickModelSet('realistic')">
-        <div style="font-size:0.72rem;letter-spacing:0.04em;margin-bottom:8px;font-weight:700;color:#6b7280;">SVM · RandForest · GradBoost<br>NeuralNet · KNN · NaiveBayes</div>
+        <div style="font-size:0.72rem;letter-spacing:0.04em;margin-bottom:8px;font-weight:700;color:#6b7280;">SVM · RandForest · GradBoost · NeuralNet</div>
         Realistic
       </button>
     </div>
@@ -598,10 +598,10 @@
   const HALF  = Math.floor(TOTAL / 2); // 60 — first-train gate
 
   const MODEL_SETS = {
-    greek:     ['α','β','γ','δ','ε','ζ'],
-    animals:   ['🦊','🐺','🐻','🦅','🦈','🐯'],
-    zodiac:    ['♈','♉','♊','♋','♌','♍'],
-    realistic: ['SVM','RandForest','GradBoost','NeuralNet','KNN','NaiveBayes'],
+    greek:     ['α','β','γ','δ'],
+    animals:   ['🦊','🐺','🐻','🦅'],
+    zodiac:    ['♈','♉','♊','♋'],
+    realistic: ['SVM','RandForest','GradBoost','NeuralNet'],
   };
 
   const MODEL_CURVES = [
@@ -609,8 +609,6 @@
     { base: 0.44, scale: 0.46, jitter: 0.04 },
     { base: 0.63, scale: 0.22, jitter: 0.02 },
     { base: 0.50, scale: 0.36, jitter: 0.12 },
-    { base: 0.40, scale: 0.54, jitter: 0.04 },
-    { base: 0.56, scale: 0.33, jitter: 0.03 },
   ];
 
   const SVG_A = `<svg viewBox="0 0 10 10"><rect class="block-fill" width="10" height="10"/></svg>`;
@@ -1016,14 +1014,14 @@
       } else if (onboardPhase === 3) {
         modelsTried.add(selectedModel);
         renderModelButtons();
-        if (modelsTried.size >= 6) {
+        if (modelsTried.size >= 4) {
           const deploySection = document.getElementById('deploy-section');
           if (deploySection.style.display === 'none') {
             deployPickIdx = -1;
             renderDeploySection();
             deploySection.style.display = 'block';
             setPulse('deploy-section');
-            positionGuide('deploy-section', `You've trained all 6 models. Check the <strong>Best Models</strong> leaderboard above, pick the one you trust most, then click <strong>Deploy →</strong>.`, { color: 'var(--train)', placement: 'after' });
+            positionGuide('deploy-section', `You've trained all 4 models. Check the <strong>Best Models</strong> leaderboard above, pick the one you trust most, then click <strong>Deploy →</strong>.`, { color: 'var(--train)', placement: 'after' });
           }
         }
       }
@@ -1348,7 +1346,7 @@
       document.getElementById('menu-models').style.display = '';
       renderModelButtons();
       setPulse('model-panel');
-      positionGuide('model-panel', `Each model learns differently. Pick one and click <strong>Train</strong> — try all 6.`, { color: 'var(--train)' });
+      positionGuide('model-panel', `Each model learns differently. Pick one and click <strong>Train</strong> — try all 4.`, { color: 'var(--train)' });
     }
   }
 

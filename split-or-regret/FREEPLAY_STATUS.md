@@ -63,27 +63,29 @@ Page structure, theme/model-name overlays, dataset selector, localStorage helper
 
 ## Remaining steps
 
-### Step 6 — Dataset 3 special controls (NOT STARTED)
-Dataset 3 has `specialBonus: 'imbalance'` — pedagogical concept: class imbalance.
-- Add undersample/oversample sliders visible only for Dataset 3
-- Per-class accuracy breakdown in accuracy panel
-- Warning if majority class dominates (e.g., "your model may be predicting the majority class")
-- `computeRealWorldAcc()` already applies an imbalance penalty for Dataset 3
+### Step 6 — Dataset 3 special controls ✅
+- `#ds3-panel` shown only when `curDatasetId === 3` (via `renderDs3Panel()`)
+- Distribution bar: 85% Class A (accent) | 15% Class B (val)
+- Undersample A slider + Oversample B slider → stored as `undersampleAmt` / `oversampleAmt`
+- `getResampleFactor()` → 0–1 from combined slider values (0–150 combined maps to full effect)
+- `computePerClassAccuracy(valAcc)` → `{accA, accB}` — without resampling accB can be as low as 10%
+- Per-class bars shown in `#class-breakdown` inside accuracy panel (Dataset 3 + trained only)
+- `ds3-warning` shown if `accB < 0.35`
+- `computeRealWorldAcc()` now reduces penalty proportionally to `getResampleFactor()`
+- Sliders re-compute `classAcc` live and update accuracy panel immediately
 
-### Step 7 — Shareable URL (NOT STARTED)
-- Encode final score + dataset + model into URL params on deploy
-- On page load: if URL params present, show a result card "Steve got 112 pts on Dataset 1"
-  with "Add to my leaderboard" / "Dismiss" buttons
-- Keep it lightweight — no server needed, just `URLSearchParams`
+### Step 7 — Shareable URL ✅
+- On deploy completion (after score animation): URL updated via `history.pushState` with
+  `?r=<score>&d=<dataset>&m=<model>&t=<testAcc>`
+- "📋 Copy link" button uses `navigator.clipboard` (falls back to prompt)
+- On page load: `checkSharedResult()` reads URL params and shows `#shared-result-card`
+- "Add to my scores": saves shared score as high score if higher, switches to that dataset
+- "Dismiss": hides card and cleans URL via `history.replaceState`
 
-### Step 8 — Dataset selector polish (NOT STARTED)
-- Datasets 2–5 locked until Dataset 1 is completed (`fpGet('dataset1Completed', false)`)
-  - Already partially implemented in `renderDatasetSelector` via `ds1ok` flag
-  - Need to SET `dataset1Completed = true` somewhere after deploy on Dataset 1
-- ⭐ stars on dataset buttons when you've beaten the competitor score for that dataset
-  - Already implemented: `const star = (hs >= d.competitorScore) ? ' ⭐' : ''`
-- Reset button (already in menu) — resets credits/runs for current dataset, keeps high scores
-- Consider: "Try again" button after deploy that resets only the current dataset session
+### Step 8 — Dataset selector polish ✅
+- `fpSet('dataset1Completed', true)` called on first deploy on Dataset 1 → unlocks Datasets 2–5
+- ⭐ stars already implemented in `renderDatasetSelector` via `const star = ...`
+- "↺ Try again" button added to deploy final section (calls `doReset()`)
 
 ## Key state variables
 ```
@@ -97,8 +99,10 @@ credits         — remaining compute budget
 modelOrder[]    — shuffled curveIdx per session
 pendingRevealIdx — model awaiting test reveal (-1 if none)
 deployedIdx     — which model was deployed (-1 if not yet)
+undersampleAmt  — Dataset 3 undersample slider value (0–100)
+oversampleAmt   — Dataset 3 oversample slider value (0–100)
 mSt[]           — per-model state: hp1, hp2, trained, lockedIn, trainAcc, valAcc, testAcc,
-                   lockedHp1, lockedHp2, runs[]
+                   lockedHp1, lockedHp2, classAcc ({accA, accB} for DS3), runs[]
 ```
 
 ## Key functions

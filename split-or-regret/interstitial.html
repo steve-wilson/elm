@@ -24,7 +24,7 @@
   }
 
   /* ── Progress dots ── */
-  .progress { display: flex; gap: 8px; justify-content: center; margin-bottom: 32px; }
+  .progress { display: flex; gap: 8px; justify-content: center; margin-bottom: 28px; }
   .pdot {
     width: 8px; height: 8px; border-radius: 50%;
     background: #e5e7eb; transition: background 0.3s;
@@ -32,10 +32,65 @@
   .pdot.active { background: #3b82f6; }
   .pdot.done   { background: #10b981; }
 
+  /* ── Question visual ── */
+  .q-vis {
+    background: #f8fafc; border: 1px solid #e2e8f0;
+    border-radius: 10px; padding: 14px 16px; margin-bottom: 18px;
+  }
+  .vis-title {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #94a3b8; margin-bottom: 10px;
+  }
+  .vis-scene {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .vis-zone {
+    display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 1;
+  }
+  .mgrid { display: flex; flex-wrap: wrap; gap: 2px; width: 80px; }
+  .mb { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .mb-train { background: #10b981; }
+  .mb-test  { background: #f97316; }
+  .mb-val   { background: #6366f1; }
+  .mb-none  { background: #e5e7eb; }
+  .ztag { font-size: 0.7rem; font-weight: 600; text-align: center; }
+  .vis-sep { color: #9ca3af; font-size: 0.85rem; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+  .vis-qbox {
+    width: 48px; height: 48px; border-radius: 8px;
+    background: #f3f4f6; border: 2px dashed #d1d5db;
+    display: flex; align-items: center; justify-content: center; font-size: 1.4rem;
+  }
+
+  /* ── Split comparison ── */
+  .split-cmp { display: flex; flex-direction: column; gap: 10px; }
+  .split-row { display: flex; align-items: center; gap: 8px; }
+  .split-lbl { font-size: 0.7rem; color: #6b7280; width: 80px; flex-shrink: 0; }
+  .split-bar { display: flex; height: 18px; border-radius: 5px; overflow: hidden; flex: 1; gap: 2px; }
+  .split-train { background: #10b981; }
+  .split-test  { background: #f97316; }
+  .split-note  { font-size: 0.7rem; white-space: nowrap; color: #9ca3af; }
+
+  /* ── Conclusion split diagram ── */
+  .conclusion-vis { margin: 20px 0 24px; }
+  .split-bar-lg {
+    display: flex; height: 28px; border-radius: 8px; overflow: hidden;
+    gap: 3px; margin-bottom: 6px;
+  }
+  .split-bar-lg div {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; font-weight: 700; color: white;
+  }
+  .split-legend {
+    display: flex; gap: 16px; font-size: 0.75rem; font-weight: 600;
+  }
+  .legend-dot {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px;
+  }
+
   /* ── Question ── */
   .q-text {
-    font-size: 1.15rem; font-weight: 800; color: #1a1a2e;
-    line-height: 1.45; margin-bottom: 22px;
+    font-size: 1.1rem; font-weight: 800; color: #1a1a2e;
+    line-height: 1.45; margin-bottom: 18px;
   }
 
   .options { display: flex; flex-direction: column; gap: 10px; }
@@ -86,6 +141,7 @@
   <div class="progress" id="progress"></div>
 
   <div id="questions-container">
+    <div id="q-vis"></div>
     <div class="q-text" id="q-text"></div>
     <div class="options" id="options"></div>
     <div class="feedback" id="feedback"></div>
@@ -95,12 +151,82 @@
   <div id="conclusion">
     <h2>The test set</h2>
     <p>Before training starts, you set aside a slice of your data. The model never touches it during training. Afterward, you evaluate on those held-out examples — and because the model has never seen them, the result is an honest estimate of real-world performance.</p>
+
+    <div class="conclusion-vis">
+      <div class="split-bar-lg">
+        <div class="split-train" style="flex:4">Training data</div>
+        <div class="split-test"  style="flex:1">Test</div>
+      </div>
+      <div class="split-legend">
+        <span><span class="legend-dot" style="background:#10b981"></span><span style="color:#10b981">Model trains here</span></span>
+        <span><span class="legend-dot" style="background:#f97316"></span><span style="color:#f97316">Held out — evaluate after training</span></span>
+      </div>
+    </div>
+
     <div class="key-term">We don't use all of the data for training. We "hold out" some of it for evaluation only.</div>
     <button class="next-btn" style="display:block;" onclick="goLevel2()">Start Level 2 →</button>
   </div>
 </div>
 
 <script>
+function blocks(n, cls) {
+  return Array(n).fill(null).map(() => `<div class="mb mb-${cls}"></div>`).join('');
+}
+
+const VISUALS = [
+  // Q1: all training data, no holdout — the Level 1 blind spot
+  `<div class="q-vis">
+    <div class="vis-title">Your Level 1 setup</div>
+    <div class="vis-scene">
+      <div class="vis-zone">
+        <div class="mgrid">${blocks(16, 'train')}</div>
+        <span class="ztag" style="color:#10b981">All training data</span>
+      </div>
+      <div class="vis-sep">→ Deploy →</div>
+      <div class="vis-zone">
+        <div class="vis-qbox">❓</div>
+        <span class="ztag" style="color:#9ca3af">Real world</span>
+      </div>
+    </div>
+  </div>`,
+
+  // Q2: holding back data — two approaches compared
+  `<div class="q-vis">
+    <div class="vis-title">Two approaches to the same data</div>
+    <div class="split-cmp">
+      <div class="split-row">
+        <div class="split-lbl" style="color:#9ca3af">All trained</div>
+        <div class="split-bar"><div class="split-train" style="flex:1"></div></div>
+        <div class="split-note">→ Deploy → ❓</div>
+      </div>
+      <div class="split-row">
+        <div class="split-lbl" style="color:#374151">Some held back</div>
+        <div class="split-bar">
+          <div class="split-train" style="flex:4"></div>
+          <div class="split-test"  style="flex:1"></div>
+        </div>
+        <div class="split-note" style="color:#10b981">→ Check first ✓</div>
+      </div>
+    </div>
+  </div>`,
+
+  // Q3: what to do with the held-out data
+  `<div class="q-vis">
+    <div class="vis-title">You've held some data back before training</div>
+    <div class="vis-scene">
+      <div class="vis-zone">
+        <div class="mgrid">${blocks(12, 'train')}</div>
+        <span class="ztag" style="color:#10b981">Model trained on these</span>
+      </div>
+      <div class="vis-sep" style="font-size:1.2rem">+</div>
+      <div class="vis-zone">
+        <div class="mgrid">${blocks(4, 'test')}</div>
+        <span class="ztag" style="color:#f97316">Model never saw these</span>
+      </div>
+    </div>
+  </div>`,
+];
+
 const QUESTIONS = [
   {
     q: "In Level 1, your model looked great on training data — but stumbled when it met the real world. What was the core problem?",
@@ -108,7 +234,7 @@ const QUESTIONS = [
       {
         text: "The model wasn't powerful enough",
         correct: false,
-        feedback: "You had six different models to try — power wasn't the issue. Think about what information was available before you hit Deploy."
+        feedback: "You had four different models to try — power wasn't the issue. Think about what information was available before you hit Deploy."
       },
       {
         text: "There wasn't enough training data",
@@ -183,6 +309,7 @@ function renderProgress() {
 
 function renderQuestion() {
   const q = QUESTIONS[currentQ];
+  document.getElementById('q-vis').innerHTML = VISUALS[currentQ] || '';
   document.getElementById('q-text').textContent = q.q;
 
   const optEl = document.getElementById('options');
@@ -210,7 +337,6 @@ function selectAnswer(opt, btn) {
   fb.textContent = opt.feedback;
 
   if (opt.correct) {
-    // Lock all options, show green
     document.querySelectorAll('.opt').forEach(b => { b.onclick = null; b.disabled = true; });
     btn.classList.add('correct');
     fb.className = 'feedback correct';
@@ -219,7 +345,6 @@ function selectAnswer(opt, btn) {
     nb.textContent = currentQ < QUESTIONS.length - 1 ? 'Next →' : 'See the takeaway →';
     nb.style.display = 'block';
   } else {
-    // Mark this option wrong, leave others clickable
     btn.classList.add('wrong');
     btn.onclick = null;
     btn.disabled = true;
